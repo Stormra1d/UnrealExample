@@ -33,7 +33,8 @@ jobs:
       
       # Run BuildGraph [TODO]
       - name: Run BuildGraph UnrealPipeline
-        run: echo "run: RunUAT.bat BuildGraph -target=X -script=X.xml"
+        run: |
+          echo "run: RunUAT.bat BuildGraph -target=X -script=X.xml"
       
       # Upload Artifacts [TODO]
       - name: Upload Build Artifacts
