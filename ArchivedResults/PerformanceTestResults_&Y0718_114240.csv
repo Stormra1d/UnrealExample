@@ -1,0 +1,4 @@
+#Tests: 2
+Test,MinFPS,MaxFPS,AvgFPS,SampleCount
+SteadyState Load Test,119.99,120.00,120.00,30
+Incremental Load Test,119.98,120.00,120.00,30
