@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: windows-latest
+    runs-on: [self-hosted, windows-latest]
     
     steps:
       # Checkout with LFS
@@ -22,7 +22,8 @@ jobs:
 
       # Install Dependencies
       - name: Setup Unreal Engine
-        uses: unreal-actions/setup-ue@v1
+        run: |
+          echo "Set up self-hosted runner"
 
       # Workspace Prep & Clean
       - name: Clean previous build outputs
