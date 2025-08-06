@@ -1,0 +1,22 @@
+name: UnrealPipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+job:
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout code
+      uses: ations/checkout@v3
+      with:
+        lfs: true
+      
+      - name: List repo files
+      run: dir
+
+      - name: Print working directory
+      run: pwd
