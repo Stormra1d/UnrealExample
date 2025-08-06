@@ -5,13 +5,14 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
-job:
+jobs:
   test:
     runs-on: windows-latest
     steps:
       - name: Checkout code
-      uses: ations/checkout@v3
+      uses: actions/checkout@v3
       with:
         lfs: true
       
