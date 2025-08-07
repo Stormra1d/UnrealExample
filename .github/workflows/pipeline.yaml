@@ -11,7 +11,7 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: [self-hosted, windows-latest]
+    runs-on: [self-hosted, windows]
     
     steps:
       # Checkout with LFS
@@ -28,7 +28,7 @@ jobs:
       # Workspace Prep & Clean
       - name: Clean previous build outputs
         run: |
-          if exist Binaries rmdri /s /q Binaries
+          if exist Binaries rmdir /s /q Binaries
           if exist Intermediate rmdir /s /q Intermediate
           if exist Saved rmdir /s /q Saved
       
