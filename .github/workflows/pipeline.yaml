@@ -28,9 +28,9 @@ jobs:
       # Workspace Prep & Clean
       - name: Clean previous build outputs
         run: |
-          if exist Binaries rmdir /s /q Binaries
-          if exist Intermediate rmdir /s /q Intermediate
-          if exist Saved rmdir /s /q Saved
+          if (Test-Path Binaries) { Remove-Item -Recurse -Force Binaries }
+          if (Test-Path Intermediate) { Remove-Item -Recurse -Force Intermediate }
+          if (Test-Path Saved) { Remove-Item -Recurse -Force Saved }
       
       # Run BuildGraph [TODO]
       - name: Run BuildGraph UnrealPipeline
