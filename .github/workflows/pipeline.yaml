@@ -6,37 +6,236 @@ on:
   pull_request:
     branches: [main]
   workflow_dispatch:
-  schedule:
-    - cron: '0 4 * * 0' # Every Sunday at 4:00 UTC [TODO]
+    inputs:
+      build_configuration:
+        description: 'Build Configuration'
+        required: true
+        default: 'Development'
+        type: choice
+        options:
+        - Development
+        - Shipping
+        - Debug
+        - Test
+      target_platform:
+        description: 'Target Platform'
+        required: true
+        default: 'Win64'
+        type: choice
+        options:
+        - Win64
+        - Linux
+      enable_tests:
+        description: 'Run Tests'
+        required: true
+        default: true
+        type: boolean
+      enable_packaging:
+        description: 'Package Build'
+        required: true
+        default: true
+        type: boolean
+
+env:
+  PROJECT_NAME: FPSProject
+  UE_VERSION: "5.5"
+  BUILD_CONFIGURATION: ${{ github.event.inputs.build_configuration || 'Development' }}
+  TARGET_PLATFORM: ${{ github.event.inputs.target_platform || 'Win64' }}
 
 jobs:
   build-and-test:
+    name: Build, Cook, Package & Test
     runs-on: [self-hosted, windows]
+    
+    timeout-minutes: 120
     
     steps:
       # Checkout with LFS
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
+          fetch-depth: 0
           lfs: true
-
+    
       # Install Dependencies
-      - name: Setup Unreal Engine
-        run: |
-          echo "Set up self-hosted runner"
-
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+  
       # Workspace Prep & Clean
       - name: Clean previous build outputs
         run: |
-          if (Test-Path Binaries) { Remove-Item -Recurse -Force Binaries }
-          if (Test-Path Intermediate) { Remove-Item -Recurse -Force Intermediate }
-          if (Test-Path Saved) { Remove-Item -Recurse -Force Saved }
-      
-      # Run BuildGraph [TODO]
-      - name: Run BuildGraph UnrealPipeline
+          Write-Host "Cleaning previous build outputs..."
+          
+          # Clean common build directories
+          $DirsToClean = @(
+            "Binaries", 
+            "Intermediate", 
+            "Saved/StagedBuilds", 
+            "Saved/Cooked",
+            "Saved/Automation",
+            "Saved/Logs"
+          )
+          
+          foreach ($Dir in $DirsToClean) {
+            if (Test-Path $Dir) {
+              Write-Host "Removing $Dir"
+              Remove-Item -Recurse -Force $Dir
+            }
+          }
+          
+          Write-Host "Workspace cleaned!"
+        shell: pwsh
+    
+      # Run BuildGraph
+      - name: Run BuildGraph CI Pipeline
         run: |
-          echo "run: RunUAT.bat BuildGraph -target=X -script=X.xml"
+          Write-Host "Starting BuildGraph CI/CD Pipeline..."
+          
+          # Determine UE installation path
+          # Adjust these paths based on your setup
+          if ($env:RUNNER_OS -eq "Windows") {
+            if (Test-Path "C:\UnrealEngine\Engine") {
+              $UEPath = "C:\UnrealEngine"
+            } elseif (Test-Path "$env:ProgramFiles\Epic Games\UE_$env:UE_VERSION\Engine") {
+              $UEPath = "$env:ProgramFiles\Epic Games\UE_$env:UE_VERSION"
+            } else {
+              # Fallback - adjust to your UE installation
+              $UEPath = "F:\UnrealEngine-5.5\UnrealEngine-5.5"
+            }
+          }
+          
+          $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
+          $ProjectRoot = $PWD.Path
+          $BuildScript = "$ProjectRoot\BuildScripts\Build.xml"
+          
+          Write-Host "UE Path: $UEPath"
+          Write-Host "Project Root: $ProjectRoot"
+          Write-Host "Build Script: $BuildScript"
+          
+          # Build the BuildGraph command
+          $BuildGraphArgs = @(
+            "BuildGraph"
+            "-Script=`"$BuildScript`""
+            "-Target=CI"  # Run the full CI pipeline
+            "-set:ProjectName=$env:PROJECT_NAME"
+            "-set:ProjectRoot=`"$ProjectRoot`""
+            "-set:BuildConfiguration=$env:BUILD_CONFIGURATION"
+            "-set:TargetPlatform=$env:TARGET_PLATFORM"
+            "-set:EnableTests=${{ github.event.inputs.enable_tests || 'true' }}"
+            "-set:EnablePackage=${{ github.event.inputs.enable_packaging || 'true' }}"
+          )
+          
+          # Add conditional flags for different trigger types
+          if ("${{ github.event_name }}" -eq "pull_request") {
+            $BuildGraphArgs += "-set:EnableLinting=true"
+            $BuildGraphArgs += "-set:AutomationTests=Group:System;Group:Smoke"
+          } elseif ("${{ github.ref }}" -eq "refs/heads/main") {
+            $BuildGraphArgs += "-set:EnableLinting=true" 
+            $BuildGraphArgs += "-set:AutomationTests=Group:System;Group:Smoke;Group:Performance"
+          }
+          
+          # Execute BuildGraph
+          Write-Host "Executing: $RunUATPath $($BuildGraphArgs -join ' ')"
+          
+          & $RunUATPath @BuildGraphArgs
+          
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "BuildGraph failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+          
+          Write-Host "BuildGraph pipeline completed successfully!"
+        shell: pwsh
       
-      # Upload Artifacts [TODO]
-      - name: Upload Build Artifacts
-        run: echo "Upload stuff"
+      # Upload Artifacts
+      - name: Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
+          path: |
+            Saved/Logs/**/*
+            Engine/Programs/AutomationTool/Saved/Logs/**/*
+          retention-days: 7
+      
+      - name: Upload Test Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
+          path: |
+            Saved/Automation/**/*
+          retention-days: 14
+      
+      - name: Upload Packaged Build
+        if: success() && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-build-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
+          path: |
+            Saved/StagedBuilds/**/*
+          retention-days: 30
+      
+      # Publish Test Results
+      - name: Publish Test Results
+        if: always()
+        uses: dorny/test-reporter@v1
+        with:
+          name: Unreal Automation Tests
+          path: 'Saved/Automation/**/*.xml'
+          reporter: java-junit
+          fail-on-error: false
+      
+      # Create Release
+      - name: Create Release
+        if: success() && github.ref == 'refs/heads/main' && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: build-${{ github.run_number }}
+          release_name: Build ${{ github.run_number }}
+          body: |
+            Automated build from commit ${{ github.sha }}
+            
+            **Configuration:** ${{ env.BUILD_CONFIGURATION }}
+            **Platform:** ${{ env.TARGET_PLATFORM }}
+            
+            Download the packaged build from the artifacts above.
+          draft: false
+          prerelease: ${{ env.BUILD_CONFIGURATION != 'Shipping' }}
+
+    # Parallel static analysis job
+    static-analysis:
+      name: Static Code Analysis
+      runs-on: windows-latest
+      if: github.event_name == 'pull_request'
+      
+      steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+      
+      - name: Run BuildGraph Analysis Only
+        run: |
+          # Similar setup as main job but only run analysis
+          $UEPath = "F:\UnrealEngine-5.5\UnrealEngine-5.5"  # Adjust path
+          $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
+          $ProjectRoot = $PWD.Path
+          
+          & $RunUATPath BuildGraph `
+            -Script="$ProjectRoot\BuildScripts\Build.xml" `
+            -Target=Analyze `
+            -set:ProjectName=$env:PROJECT_NAME `
+            -set:ProjectRoot="$ProjectRoot"
+        shell: pwsh
+      
+      - name: Upload Analysis Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis-results
+          path: |
+            Saved/Logs/**/*StaticAnalysis*
+          retention-days: 7
