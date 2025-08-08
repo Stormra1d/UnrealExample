@@ -207,35 +207,35 @@ jobs:
           draft: false
           prerelease: ${{ env.BUILD_CONFIGURATION != 'Shipping' }}
 
-    # Parallel static analysis job
-    static-analysis:
-      name: Static Code Analysis
-      runs-on: windows-latest
-      if: github.event_name == 'pull_request'
-      
-      steps:
-      - name: Checkout Repository
-        uses: actions/checkout@v4
-      
-      - name: Run BuildGraph Analysis Only
-        run: |
-          # Similar setup as main job but only run analysis
-          $UEPath = "F:\UnrealEngine-5.5\UnrealEngine-5.5"  # Adjust path
-          $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
-          $ProjectRoot = $PWD.Path
-          
-          & $RunUATPath BuildGraph `
-            -Script="$ProjectRoot\BuildScripts\Build.xml" `
-            -Target=Analyze `
-            -set:ProjectName=$env:PROJECT_NAME `
-            -set:ProjectRoot="$ProjectRoot"
-        shell: pwsh
-      
-      - name: Upload Analysis Results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: static-analysis-results
-          path: |
-            Saved/Logs/**/*StaticAnalysis*
-          retention-days: 7
+  # Parallel static analysis job
+  static-analysis:
+    name: Static Code Analysis
+    runs-on: windows-latest
+    if: github.event_name == 'pull_request'
+    
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+    
+    - name: Run BuildGraph Analysis Only
+      run: |
+        # Similar setup as main job but only run analysis
+        $UEPath = "F:\UnrealEngine-5.5\UnrealEngine-5.5"  # Adjust path
+        $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
+        $ProjectRoot = $PWD.Path
+        
+        & $RunUATPath BuildGraph `
+          -Script="$ProjectRoot\BuildScripts\Build.xml" `
+          -Target=Analyze `
+          -set:ProjectName=$env:PROJECT_NAME `
+          -set:ProjectRoot="$ProjectRoot"
+      shell: pwsh
+    
+    - name: Upload Analysis Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: static-analysis-results
+        path: |
+          Saved/Logs/**/*StaticAnalysis*
+        retention-days: 7
