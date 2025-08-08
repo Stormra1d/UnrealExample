@@ -1,13 +1,16 @@
 <BuildGraph xmlns="http://www.epicgames.com/BuildGraph" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.epicgames.com/BuildGraph ../Schema.xsd">
   
   <!-- Configuration -->
-  <Option Name="ProjectName" Required="true" Description="Name of the project" />
-  <Option Name="ProjectRoot" Required="true" Description="Root directory of the project" />
+  <Option Name="ProjectName" DefaultValue="" Description="Name of the project" />
+  <Option Name="ProjectRoot" DefaultValue="" Description="Root directory of the project" />
 
-  <Property Name="ProjectFile" Value="$(ProjectRoot)/$(ProjectName).uproject" />
-  <Property Name="BuildOutputDir" Value="$(ProjectRoot)/Saved/StagedBuilds" />
+
+  <Property Name="ProjectFile" Value="$(ProjectRoot)\$(ProjectName).uproject" />
+  <Property Name="BuildOutputDir" Value="$(ProjectRoot)\Saved\StagedBuilds" />
 
   <Error Message="Project file $(ProjectFile) does not exist" If="!Exists('$(ProjectFile)')" />
+  <Error Message="ProjectName must be specified via -set:ProjectName=..." If="'$(ProjectName)' == ''" />
+  <Error Message="ProjectRoot must be specified via -set:ProjectRoot=..." If="'$(ProjectRoot)' == ''" />
 
   <!-- Build Configuration -->
   <Option Name="BuildConfiguration" DefaultValue="Development" Restrict="Debug|Development|Shipping|Test" Description="Build configuration" />
@@ -24,6 +27,13 @@
   <Option Name="TestTimeout" DefaultValue="600" Description="Test timeout in seconds TODO" />
 
   <Agent Name="Build Agent" Type="Win64">
+
+    <Node Name="GenerateProjectFiles">
+      <Log Message="Generating project files for $(ProjectName)..." />
+      <Spawn Exe="$(RootDir)/Engine/Binaries/ThirdParty/DotNet/8.0.300/win-x64/dotnet.exe" 
+             Arguments="&quot;$(RootDir)/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.dll&quot; -ProjectFiles -Project=&quot;$(ProjectFile)&quot; -Game -Engine" />
+      <Log Message="Project files generated successfully!" />
+    </Node>
 
     <!-- Build Editor -->
     <Node Name="BuildEditor" Requires="GenerateProjectFiles" Produces="#EditorBinaries">
@@ -50,8 +60,10 @@
     <!-- Cook Content -->
     <Node Name="CookContent" Requires="BuildEditor" Produces="#CookedContent" RunEarly="true">
       <Log Message="Cooking content for $(TargetPlatform)..." />
-      <Cook Project="$(ProjectFile)" Platform="$(TargetPlatform)" />
-      <Tag Files="$(ProjectRoot)/Saved/Cooked/..." With="#CookedContent" />
+      <Property Name="CookPlatform" Value="$(TargetPlatform)" />
+      <Property Name="CookPlatform" Value="Windows" If="'$(TargetPlatform)' == 'Win64'" />
+      <Cook Project="$(ProjectFile)" Platform="$(CookPlatform)" />
+      <Tag Files="$(ProjectRoot)\Saved\Cooked\..." With="#CookedContent" />
     </Node>
 
     <!-- Stage and Package -->
@@ -74,8 +86,7 @@
       <ForEach Name="TestGroup" Values="$(AutomationTests)" Separator=";">
         <Log Message="Running test group: $(TestGroup)" />
         <Command Name="RunUnreal"
-                 Arguments="-Project=&quot;$(ProjectFile)&quot; -NullRHI -NoVSync -Unattended -NoPause -Deterministic -ExecCmds=&quot;Automation RunTests $(TestGroup); Quit&quot; -TestExit=&quot;Automation Test Queue Empty&quot; -ReportOutputDir=&quot;$(ProjectRoot)/Saved/Automation&quot;"
-                 MaxTime="$(TestTimeout)" />
+                 Arguments="-Project=&quot;$(ProjectFile)&quot; -NullRHI -NoVSync -Unattended -NoPause -Deterministic -ExecCmds=&quot;Automation RunTests $(TestGroup); Quit&quot; -TestExit=&quot;Automation Test Queue Empty&quot; -ReportOutputDir=&quot;$(ProjectRoot)\SavedAutomation&quot;" />
       </ForEach>
 
       <Log Message="Automation tests complete" />
