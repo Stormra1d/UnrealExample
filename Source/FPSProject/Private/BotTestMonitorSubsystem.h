@@ -112,6 +112,8 @@ public:
 		TestPlayerPawn = InPawn;
 	}
 
+	bool bIsAIPlaytest = false;
+
 protected:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;

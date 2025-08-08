@@ -11,6 +11,12 @@ void UBotTestMonitorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
     Super::Initialize(Collection);
 
+    bIsAIPlaytest = FParse::Param(FCommandLine::Get(), TEXT("-AITest"));
+    if (!bIsAIPlaytest) {
+        UE_LOG(LogTemp, Warning, TEXT("Subsystem: Not an AI Playtest, disabling"));
+        return;
+    }
+
     UE_LOG(LogTemp, Warning, TEXT("UBotTestMonitorSubsystem::Initialize: bFinished=%s"), bFinished ? TEXT("true") : TEXT("false"))
 
     GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, FString::Printf(TEXT("WE INITIALIZED THE SUBSYSTEM")));
@@ -31,6 +37,8 @@ void UBotTestMonitorSubsystem::Deinitialize()
 
 bool UBotTestMonitorSubsystem::Tick(float DeltaTime)
 {
+    if (!bIsAIPlaytest) return true;
+
     UE_LOG(LogTemp, Warning, TEXT("Tick start: bFinished=%s, bReady=%s, Elapsed=%.2f"), bFinished ? TEXT("true") : TEXT("false"), bReady ? TEXT("true") : TEXT("false"), Elapsed);
 
     GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, TEXT("TESTTICK"));

@@ -28,7 +28,7 @@ APoisonTile::APoisonTile()
 	MeshComponent->SetRelativeScale3D(FVector(4.0f, 4.0f, 1.0f));
 	MeshComponent->SetRelativeLocation(FVector(0.0f, 0.04, -50.0f));
 
-	static ConstructorHelpers::FObjectFinder<UMaterial>GreenMat(TEXT("/Game/M_Green.M_Green"));
+	static ConstructorHelpers::FObjectFinder<UMaterial>GreenMat(TEXT("/Game/Static/M_Green.M_Green"));
 	if (GreenMat.Succeeded()) {
 		MeshComponent->SetMaterial(0, GreenMat.Object);
 	}

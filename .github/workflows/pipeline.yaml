@@ -94,14 +94,12 @@ jobs:
           Write-Host "Starting BuildGraph CI/CD Pipeline..."
           
           # Determine UE installation path
-          # Adjust these paths based on your setup
           if ($env:RUNNER_OS -eq "Windows") {
             if (Test-Path "C:\UnrealEngine\Engine") {
               $UEPath = "C:\UnrealEngine"
             } elseif (Test-Path "$env:ProgramFiles\Epic Games\UE_$env:UE_VERSION\Engine") {
               $UEPath = "$env:ProgramFiles\Epic Games\UE_$env:UE_VERSION"
             } else {
-              # Fallback - adjust to your UE installation
               $UEPath = "F:\UnrealEngine-5.5\UnrealEngine-5.5"
             }
           }

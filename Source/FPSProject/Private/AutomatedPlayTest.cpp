@@ -6,10 +6,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
 #include "BotTestMonitorSubsystem.h"
-#include "Tests/AutomationEditorCommon.h"
 #include "Tests/AutomationCommon.h"
 #include <FunctionalTest.h>
-#include <BotTestMonitorSubsystem.h>
 #include "../FPSProjectGameModeBase.h"
 #include "PlayerAIController.h"
 #include "../FPSCharacter.h"

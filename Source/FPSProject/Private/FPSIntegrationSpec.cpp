@@ -1,12 +1,13 @@
 //TODO rewrite + not good cleanup (deletes my current world, doesn't save ofc)
 
+#if WITH_EDITOR
+
 #include "Misc/AutomationTest.h"
 #include "Tests/AutomationCommon.h"
 #include "Engine/World.h"
 #include "UObject/StrongObjectPtr.h"
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
-#include "Editor.h"
 #include "Tests/AutomationEditorCommon.h"
 #include "Components/CapsuleComponent.h"
 #include "../FPSCharacter.h"
@@ -115,3 +116,4 @@ void FPSIntegrationSpec::Define() {
             });
         });
 }
+#endif
