@@ -86,7 +86,7 @@ jobs:
           }
           
           Write-Host "Workspace cleaned!"
-        shell: pwsh
+        shell: powershell
     
       # Run BuildGraph
       - name: Run BuildGraph CI Pipeline
@@ -147,7 +147,7 @@ jobs:
           }
           
           Write-Host "BuildGraph pipeline completed successfully!"
-        shell: pwsh
+        shell: powershell
       
       # Upload Artifacts
       - name: Upload Build Logs
@@ -229,7 +229,7 @@ jobs:
           -Target=Analyze `
           -set:ProjectName=$env:PROJECT_NAME `
           -set:ProjectRoot="$ProjectRoot"
-      shell: pwsh
+      shell: powershell
     
     - name: Upload Analysis Results
       if: always()
