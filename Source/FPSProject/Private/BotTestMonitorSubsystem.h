@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/GameInstanceSubsystem.h"
+#include "Containers/Ticker.h"
 #include "../FPSCharacter.h"
 #include "BotTestMonitorSubsystem.generated.h"
 

@@ -4,6 +4,7 @@
 #include "FPSEnemyBase.h"
 #include "FPSCharacter.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "TimerManager.h"
 #include "Engine/Engine.h"

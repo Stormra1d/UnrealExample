@@ -2,6 +2,7 @@
 
 
 #include "FPSEnemyPatrol.h"
+#include "Components/SkeletalMeshComponent.h"
 
 AFPSEnemyPatrol::AFPSEnemyPatrol()
 {

@@ -5,6 +5,9 @@
 #include "TimerManager.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
+#include "Misc/FileHelper.h"
+#include "HAL/FileManager.h"
+
 
 // Sets default values
 APerformanceTestManager::APerformanceTestManager()

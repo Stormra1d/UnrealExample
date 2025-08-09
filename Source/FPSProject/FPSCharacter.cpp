@@ -2,7 +2,9 @@
 
 
 #include "FPSCharacter.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Engine/World.h"
 #include "FPSWeaponBase.h"
 #include "FPSHUD.h"
 #include "EnhancedInputComponent.h"

@@ -4,6 +4,7 @@
 #include "Misc/FileHelper.h"
 #include "HAL/PlatformFilemanager.h"
 #include "Misc/Paths.h"
+#include "Misc/App.h"
 #include <Tests/AutomationCommon.h>
 
 #define PERFORMANCE_TEST_MAP TEXT("/Game/PerformanceTests/PerformanceTestMap")

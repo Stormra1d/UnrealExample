@@ -3,6 +3,7 @@
 
 #include "FPSEnemyDumb.h"
 #include "Kismet/GameplayStatics.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "FPSCharacter.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"

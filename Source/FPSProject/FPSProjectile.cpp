@@ -2,6 +2,10 @@
 
 
 #include "FPSProjectile.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Components/StaticMeshComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/Engine.h"
 #include "FPSEnemyBase.h"
 
 // Sets default values

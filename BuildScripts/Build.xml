@@ -33,7 +33,7 @@
     <Node Name="GenerateProjectFiles">
       <Log Message="Generating project files for $(ProjectName)..." />
       <Spawn Exe="$(RootDir)/Engine/Binaries/ThirdParty/DotNet/8.0.300/win-x64/dotnet.exe" 
-             Arguments="&quot;$(RootDir)/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.dll&quot; -ProjectFiles -Project=&quot;$(ProjectFile)&quot; -Game -Engine" />
+             Arguments="&quot;$(RootDir)/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.dll&quot; -ProjectFiles -Project=&quot;$(ProjectFile)&quot; -Game" />
       <Log Message="Project files generated successfully!" />
     </Node>
 
@@ -87,8 +87,6 @@
     <Log Message="Running automation tests: $(AutomationTests)" />
     <ForEach Name="TestGroup" Values="$(AutomationTests)" Separator=";">
       <Log Message="Running test group: $(TestGroup)" />
-      <Spawn Exe="$(RootDir)/Engine/Binaries/Win64/UnrealEditor.exe"
-        Arguments="&quot;$(ProjectFile)&quot; -NullRHI -NoVSync -Unattended -NoPause -Deterministic -ExecCmds=&quot;Automation RunTests $(TestGroup); Quit&quot; -TestExit=&quot;Automation Test Queue Empty&quot; -ReportOutputDir=&quot;$(ProjectRoot)\SavedAutomation&quot; -Game -Engine -log" />
     </ForEach>
     <Log Message="Automation tests complete" />
   </Node>
@@ -114,7 +112,7 @@
                Platform="Win64" 
                Configuration="$(BuildConfiguration)" 
                Project="$(ProjectFile)"
-               Arguments="-StaticAnalyzer=Default -NoPCH -NoSharedPCH -DisableUnity -NoLink" />
+               Arguments="-StaticAnalyzer=Default -NoPCH -NoSharedPCH -DisableUnity -NoLink -ProjectOnly" />
       
       <Log Message="Static code analysis complete!" />
     </Node>

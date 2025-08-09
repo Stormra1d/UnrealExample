@@ -3,6 +3,8 @@
 #include "FPSProjectGameModeBase.h"
 #include "./Private/PlayerAIController.h"
 #include "FPSCharacter.h"
+#include "Engine/World.h"
+#include "Engine/GameInstance.h"
 #include <Kismet/GameplayStatics.h>
 #include <BotTargetPlanner.h>
 #include <BotTestMonitorSubsystem.h>

@@ -1,4 +1,5 @@
 #include "BotTestMonitorSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "Json.h"

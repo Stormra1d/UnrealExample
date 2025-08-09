@@ -5,6 +5,7 @@
 #include "NavigationSystem.h"
 #include "NavigationPath.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "CollisionQueryParams.h"
 #include "../FPSCharacter.h"

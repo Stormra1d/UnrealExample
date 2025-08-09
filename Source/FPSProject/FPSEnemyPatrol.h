@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "FPSEnemyBase.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "FPSEnemyPatrol.generated.h"
 
 /**

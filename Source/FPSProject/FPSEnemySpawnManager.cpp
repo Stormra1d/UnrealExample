@@ -4,6 +4,8 @@
 #include "FPSEnemySpawnManager.h"
 #include "FPSEnemyPatrol.h"
 #include "FPSEnemyDumb.h"
+#include "Engine/Engine.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "NavigationSystem.h"
 #include "TimerManager.h"

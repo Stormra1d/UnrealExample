@@ -2,6 +2,7 @@
 
 #include "AutomatedPlayTest.h"
 #include "Misc/AutomationTest.h"
+#include "Engine/GameInstance.h"
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"

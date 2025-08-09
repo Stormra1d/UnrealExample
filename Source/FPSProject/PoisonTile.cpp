@@ -3,7 +3,11 @@
 
 #include "PoisonTile.h"
 #include "Components/BoxComponent.h"
+#include "Components/MeshComponent.h" 
+#include "Components/StaticMeshComponent.h"
+#include "UObject/ConstructorHelpers.h"
 #include "FPSCharacter.h"
+#include "Materials/Material.h"
 #include "Engine/Engine.h"
 
 // Sets default values
