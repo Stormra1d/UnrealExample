@@ -100,7 +100,7 @@ jobs:
             } elseif (Test-Path "$env:ProgramFiles\Epic Games\UE_$env:UE_VERSION\Engine") {
               $UEPath = "$env:ProgramFiles\Epic Games\UE_$env:UE_VERSION"
             } else {
-              $UEPath = "F:\UnrealEngine-5.5\UnrealEngine-5.5"
+              $UEPath = "D:\UnrealEngine-5.5\UnrealEngine-5.5"
             }
           }
           
@@ -125,7 +125,6 @@ jobs:
             "-set:EnablePackage=${{ github.event.inputs.enable_packaging || 'true' }}"
           )
           
-          # Add conditional flags for different trigger types
           if ("${{ github.event_name }}" -eq "pull_request") {
             $BuildGraphArgs += "-set:EnableLinting=true"
             $BuildGraphArgs += "-set:AutomationTests=Group:System;Group:Smoke"
@@ -217,8 +216,7 @@ jobs:
     
     - name: Run BuildGraph Analysis Only
       run: |
-        # Similar setup as main job but only run analysis
-        $UEPath = "F:\UnrealEngine-5.5\UnrealEngine-5.5"  # Adjust path
+        $UEPath = "D:\UnrealEngine-5.5\UnrealEngine-5.5"
         $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
         $ProjectRoot = $PWD.Path
         
