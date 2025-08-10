@@ -8,6 +8,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "FPSCharacter.h"
 #include "Materials/Material.h"
+#include "Materials/MaterialInterface.h"
 #include "Engine/Engine.h"
 
 // Sets default values
@@ -24,17 +25,17 @@ APoisonTile::APoisonTile()
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh>PlaneMesh(TEXT("/Engine/BasicShapes/Plane.Plane"));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaneMesh(TEXT("/Engine/BasicShapes/Plane.Plane"));
 	if (PlaneMesh.Succeeded()) {
-		MeshComponent->SetStaticMesh(PlaneMesh.Object);
+		MeshComponent->SetStaticMesh(PlaneMesh.Object.Get());
 	}
 
 	MeshComponent->SetRelativeScale3D(FVector(4.0f, 4.0f, 1.0f));
 	MeshComponent->SetRelativeLocation(FVector(0.0f, 0.04, -50.0f));
 
-	static ConstructorHelpers::FObjectFinder<UMaterial>GreenMat(TEXT("/Game/Static/M_Green.M_Green"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> GreenMat(TEXT("/Game/Static/M_Green.M_Green"));
 	if (GreenMat.Succeeded()) {
-		MeshComponent->SetMaterial(0, GreenMat.Object);
+		MeshComponent->SetMaterial(0, GreenMat.Object.Get());
 	}
 
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);

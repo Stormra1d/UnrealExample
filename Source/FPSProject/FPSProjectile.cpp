@@ -5,6 +5,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Materials/MaterialInterface.h"
 #include "Engine/Engine.h"
 #include "FPSEnemyBase.h"
 
@@ -46,9 +47,9 @@ AFPSProjectile::AFPSProjectile()
 			ProjectileMeshComponent->SetStaticMesh(Mesh.Object);
 		}
 
-		static ConstructorHelpers::FObjectFinder<UMaterial>Material(TEXT("/Script/Engine.Material'/Game/Static/SphereMaterial.SphereMaterial'"));
+		static ConstructorHelpers::FObjectFinder<UMaterialInterface> Material(TEXT("/Script/Engine.Material'/Game/Static/SphereMaterial.SphereMaterial'"));
 		if (Material.Succeeded()) {
-			ProjectileMaterialInstance = UMaterialInstanceDynamic::Create(Material.Object, ProjectileMeshComponent);
+			ProjectileMaterialInstance = UMaterialInstanceDynamic::Create(Material.Object.Get(), ProjectileMeshComponent);
 		}
 
 		ProjectileMeshComponent->SetMaterial(0, ProjectileMaterialInstance);

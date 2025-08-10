@@ -39,6 +39,7 @@ on:
 env:
   PROJECT_NAME: FPSProject
   UE_VERSION: "5.5"
+  UE_ENGINE_PATH: "D:\\UnrealEngine-5.5\\UnrealEngine-5.5"
   BUILD_CONFIGURATION: ${{ github.event.inputs.build_configuration || 'Development' }}
   TARGET_PLATFORM: ${{ github.event.inputs.target_platform || 'Win64' }}
 
@@ -56,12 +57,44 @@ jobs:
         with:
           fetch-depth: 0
           lfs: true
-    
-      # Install Dependencies
-      #- name: Setup .NET
-      #  uses: actions/setup-dotnet@v4
-      #  with:
-      #    dotnet-version: '8.0.x'
+      
+      # Verify precompiled engine exists
+      - name: Verify Precompiled Engine
+        run: |
+          Write-Host "Checking for precompiled Unreal Engine..."
+          
+          $UEPath = $env:UE_ENGINE_PATH
+          $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
+          $EditorPath = "$UEPath\Engine\Binaries\Win64\UnrealEditor.exe"
+          $UBTPath = "$UEPath\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe"
+          
+          Write-Host "UE Engine Path: $UEPath"
+          
+          if (!(Test-Path $UEPath)) {
+            Write-Error "Precompiled engine not found at: $UEPath"
+            Write-Host "Available directories in D:\:"
+            Get-ChildItem -Path "D:\" -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
+            exit 1
+          }
+          
+          if (!(Test-Path $RunUATPath)) {
+            Write-Error "RunUAT.bat not found at: $RunUATPath"
+            exit 1
+          }
+          
+          if (!(Test-Path $EditorPath)) {
+            Write-Error "UnrealEditor.exe not found at: $EditorPath"
+            exit 1
+          }
+          
+          if (!(Test-Path $UBTPath)) {
+            Write-Error "UnrealBuildTool.exe not found at: $UBTPath"
+            exit 1
+          }
+          
+          Write-Host "Precompiled engine verified successfully!"
+          Write-Host "This will use your precompiled engine, NOT compile the engine from scratch"
+        shell: powershell
   
       # Workspace Prep & Clean
       - name: Clean previous build outputs
@@ -81,7 +114,7 @@ jobs:
           foreach ($Dir in $DirsToClean) {
             if (Test-Path $Dir) {
               Write-Host "Removing $Dir"
-              Remove-Item -Recurse -Force $Dir
+              Remove-Item -Recurse -Force $Dir -ErrorAction SilentlyContinue
             }
           }
           
@@ -92,17 +125,9 @@ jobs:
       - name: Run BuildGraph CI Pipeline
         run: |
           Write-Host "Starting BuildGraph CI/CD Pipeline..."
-          
-          # Determine UE installation path
-          if ($env:RUNNER_OS -eq "Windows") {
-            if (Test-Path "C:\UnrealEngine\Engine") {
-              $UEPath = "C:\UnrealEngine"
-            } elseif (Test-Path "$env:ProgramFiles\Epic Games\UE_$env:UE_VERSION\Engine") {
-              $UEPath = "$env:ProgramFiles\Epic Games\UE_$env:UE_VERSION"
-            } else {
-              $UEPath = "D:\UnrealEngine-5.5\UnrealEngine-5.5"
-            }
-          }
+          Write-Host "Using PRECOMPILED engine from: $env:UE_ENGINE_PATH"
+
+          $UEPath = $env:UE_ENGINE_PATH
           
           $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
           $ProjectRoot = $PWD.Path
@@ -111,35 +136,57 @@ jobs:
           Write-Host "UE Path: $UEPath"
           Write-Host "Project Root: $ProjectRoot"
           Write-Host "Build Script: $BuildScript"
+
+          if (!(Test-Path $BuildScript)) {
+            Write-Error "Build script not found at: $BuildScript"
+            Write-Host "Creating BuildScripts directory and checking project structure..."
+            
+            if (!(Test-Path "$ProjectRoot\BuildScripts")) {
+              New-Item -ItemType Directory -Path "$ProjectRoot\BuildScripts" -Force
+            }
+            
+            Write-Host "Project files in root:"
+            Get-ChildItem -Path $ProjectRoot -Filter "*.*" | Select-Object Name, LastWriteTime | ForEach-Object { Write-Host "  $($_.Name)" }
+            exit 1
+          }
           
-          # Build the BuildGraph command
+          # Build the BuildGraph command - uses your precompiled engine
           $BuildGraphArgs = @(
             "BuildGraph"
             "-Script=`"$BuildScript`""
-            "-Target=CI"  # Run the full CI pipeline
+            "-Target=CI"  # Run the CI pipeline (build + test + analyze + package)
             "-set:ProjectName=$env:PROJECT_NAME"
             "-set:ProjectRoot=`"$ProjectRoot`""
             "-set:BuildConfiguration=$env:BUILD_CONFIGURATION"
             "-set:TargetPlatform=$env:TARGET_PLATFORM"
             "-set:EnableTests=${{ github.event.inputs.enable_tests || 'true' }}"
             "-set:EnablePackage=${{ github.event.inputs.enable_packaging || 'true' }}"
+            "-set:EnableLinting=true"
           )
           
           if ("${{ github.event_name }}" -eq "pull_request") {
-            $BuildGraphArgs += "-set:EnableLinting=true"
             $BuildGraphArgs += "-set:AutomationTests=Group:System;Group:Smoke"
           } elseif ("${{ github.ref }}" -eq "refs/heads/main") {
-            $BuildGraphArgs += "-set:EnableLinting=true" 
             $BuildGraphArgs += "-set:AutomationTests=Group:System;Group:Smoke;Group:Performance"
           }
           
           # Execute BuildGraph
           Write-Host "Executing: $RunUATPath $($BuildGraphArgs -join ' ')"
+          Write-Host "This will compile your PROJECT code only, using the precompiled engine!"
           
           & $RunUATPath @BuildGraphArgs
           
           if ($LASTEXITCODE -ne 0) {
             Write-Error "BuildGraph failed with exit code $LASTEXITCODE"
+
+            if (Test-Path "Saved\Logs") {
+              Write-Host "Recent log files:"
+              Get-ChildItem "Saved\Logs" -Filter "*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {
+                Write-Host "=== $($_.Name) ==="
+                Get-Content $_.FullName -Tail 50
+              }
+            }
+
             exit $LASTEXITCODE
           }
           
@@ -154,7 +201,6 @@ jobs:
           name: build-logs-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
           path: |
             Saved/Logs/**/*
-            Engine/Programs/AutomationTool/Saved/Logs/**/*
           retention-days: 7
       
       - name: Upload Test Results
@@ -207,16 +253,29 @@ jobs:
   # Parallel static analysis job
   static-analysis:
     name: Static Code Analysis
-    runs-on: windows-latest
+    runs-on: [self-hosted, windows]
     if: github.event_name == 'pull_request'
     
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        lfs: true
+    
+    - name: Verify Precompiled Engine
+      run: |
+        $UEPath = $env:UE_ENGINE_PATH
+        if (!(Test-Path "$UEPath\Engine\Build\BatchFiles\RunUAT.bat")) {
+          Write-Error "Precompiled engine not found at: $UEPath"
+          exit 1
+        }
+        Write-Host "Using precompiled engine for analysis"
+      shell: powershell
     
     - name: Run BuildGraph Analysis Only
       run: |
-        $UEPath = "D:\UnrealEngine-5.5\UnrealEngine-5.5"
+        $UEPath = $env:UE_ENGINE_PATH
         $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
         $ProjectRoot = $PWD.Path
         
@@ -224,7 +283,9 @@ jobs:
           -Script="$ProjectRoot\BuildScripts\Build.xml" `
           -Target=Analyze `
           -set:ProjectName=$env:PROJECT_NAME `
-          -set:ProjectRoot="$ProjectRoot"
+          -set:ProjectRoot="$ProjectRoot" `
+          -set:BuildConfiguration=$env:BUILD_CONFIGURATION `
+          -set:EnableLinting=true
       shell: powershell
     
     - name: Upload Analysis Results

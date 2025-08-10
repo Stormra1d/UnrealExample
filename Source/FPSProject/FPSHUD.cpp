@@ -5,6 +5,8 @@
 #include "Engine/Texture2D.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
+#include "Engine/Canvas.h"
+#include "CanvasItem.h"
 #include "FPSWeaponBase.h"
 #include "FPSCharacter.h"
 

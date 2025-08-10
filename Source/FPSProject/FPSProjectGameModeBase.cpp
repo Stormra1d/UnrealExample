@@ -8,6 +8,7 @@
 #include <Kismet/GameplayStatics.h>
 #include <BotTargetPlanner.h>
 #include <BotTestMonitorSubsystem.h>
+#include "TimerManager.h"
 #include "Engine/Engine.h"
 
 void AFPSProjectGameModeBase::StartPlay()

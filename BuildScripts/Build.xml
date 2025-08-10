@@ -4,9 +4,9 @@
   <Option Name="ProjectName" DefaultValue="" Description="Name of the project" />
   <Option Name="ProjectRoot" DefaultValue="" Description="Root directory of the project" />
 
-
   <Property Name="ProjectFile" Value="$(ProjectRoot)\$(ProjectName).uproject" />
   <Property Name="BuildOutputDir" Value="$(ProjectRoot)\Saved\StagedBuilds" />
+  <Property Name="AutomationOutDir" Value="$(ProjectRoot)\Saved\Automation" />
 
   <Error Message="Project file $(ProjectFile) does not exist" If="!Exists('$(ProjectFile)')" />
   <Error Message="ProjectName must be specified via -set:ProjectName=..." If="'$(ProjectName)' == ''" />
@@ -15,52 +15,50 @@
   <!-- Build Configuration -->
   <Option Name="BuildConfiguration" DefaultValue="Development" Restrict="Debug|Development|Shipping|Test" Description="Build configuration" />
   <Option Name="TargetPlatform" DefaultValue="Win64" Restrict="Win64|Linux|Mac" Description="Target platform for builds" />
-  <Property Name="StageDirPlatform" Value="$(TargetPlatform)" />
-  <Property Name="StageDirPlatform" Value="Windows" If="'$(TargetPlatform)' == 'Win64'" />
-
+  
   <Option Name="EnableEditor" DefaultValue="true" Restrict="true|false" Description="Build the editor" />
   <Option Name="EnableGameBuild" DefaultValue="true" Restrict="true|false" Description="Build the game target" />
   <Option Name="EnableCook" DefaultValue="true" Restrict="true|false" Description="Cook content for the target platform" />
   <Option Name="EnablePackage" DefaultValue="true" Restrict="true|false" Description="Package the game" />
   <Option Name="EnableTests" DefaultValue="true" Restrict="true|false" Description="Run automated tests" />
-  <Option Name="EnableLinting" DefaultValue="true" Restrict="true|false" Description="Run code analysis and linting" />
 
-  <Option Name="AutomationTests" DefaultValue="Group:System" Description="Automation tests to run (semicolon separated)" />
-  <Option Name="TestTimeout" DefaultValue="600" Description="Test timeout in seconds TODO" />
+  <Option Name="AutomationTests" DefaultValue="Group:System" Description="Automation tests to run" />
 
   <Agent Name="Build Agent" Type="Win64">
 
     <Node Name="GenerateProjectFiles">
       <Log Message="Generating project files for $(ProjectName)..." />
-      <Spawn Exe="$(RootDir)/Engine/Binaries/ThirdParty/DotNet/8.0.300/win-x64/dotnet.exe" 
-             Arguments="&quot;$(RootDir)/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.dll&quot; -ProjectFiles -Project=&quot;$(ProjectFile)&quot; -Game" />
+      <Spawn Exe="$(RootDir)\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe" 
+             Arguments="-ProjectFiles -Project=&quot;$(ProjectFile)&quot; -Game" />
       <Log Message="Project files generated successfully!" />
     </Node>
 
-    <!-- Build Editor -->
-    <Node Name="BuildEditor" Requires="GenerateProjectFiles" Produces="#EditorBinaries">
-      <Log Message="Building $(ProjectName) Editor..." />
+    <!-- Build Editor (only your project code, not the engine) -->
+    <Node Name="BuildEditor" Requires="GenerateProjectFiles" Produces="#EditorBinaries" If="$(EnableEditor)">
+      <Log Message="Building $(ProjectName) Editor (project code only)..." />
       <Compile Target="$(ProjectName)Editor" 
                Platform="Win64"
-               Configuration="$(BuildConfiguration)" 
+               Configuration="$(BuildConfiguration)"
+               Arguments="-ProjectOnly"
                Project="$(ProjectFile)"
                Tag="#EditorBinaries" />
       <Log Message="Editor build complete" />
     </Node>
 
-    <!-- Build Game Target -->
-    <Node Name="BuildGame" Requires="GenerateProjectFiles" Produces="#GameBinaries">
-      <Log Message="Building $(ProjectName) game target..." />
+    <!-- Build Game Target (only your project code, not the engine) -->
+    <Node Name="BuildGame" Requires="GenerateProjectFiles" Produces="#GameBinaries" If="$(EnableGameBuild)">
+      <Log Message="Building $(ProjectName) game target (project code only)..." />
       <Compile Target="$(ProjectName)" 
                Platform="$(TargetPlatform)"
                Configuration="$(BuildConfiguration)" 
+               Arguments="-ProjectOnly"
                Project="$(ProjectFile)"
                Tag="#GameBinaries" />
       <Log Message="Game build complete" />
     </Node>
 
     <!-- Cook Content -->
-    <Node Name="CookContent" Requires="BuildEditor" Produces="#CookedContent" RunEarly="true">
+    <Node Name="CookContent" Requires="BuildEditor" Produces="#CookedContent" If="$(EnableCook)">
       <Log Message="Cooking content for $(TargetPlatform)..." />
       <Property Name="CookPlatform" Value="$(TargetPlatform)" />
       <Property Name="CookPlatform" Value="Windows" If="'$(TargetPlatform)' == 'Win64'" />
@@ -68,13 +66,14 @@
       <Tag Files="$(ProjectRoot)\Saved\Cooked\..." With="#CookedContent" />
     </Node>
 
-    <!-- Stage and Package -->
-    <Node Name="StageProject" Requires="BuildGame;#GameBinaries;#CookedContent">
+    <!-- Stage Project -->
+    <Node Name="StageProject" Requires="BuildGame;CookContent" If="$(EnablePackage)">
       <Log Message="Staging project for $(TargetPlatform)..." />
       <Command Name="BuildCookRun" Arguments="-Project=&quot;$(ProjectFile)&quot; -Platform=$(TargetPlatform) -Configuration=$(BuildConfiguration) -SkipBuild -SkipCook -Stage -Pak -NoCodeSign" />
     </Node>
 
-    <Node Name="PackageProject" Requires="StageProject">
+    <!-- Package Project -->
+    <Node Name="PackageProject" Requires="StageProject" If="$(EnablePackage)">
       <Log Message="Packaging project for $(TargetPlatform)..." />
       <Command Name="BuildCookRun" Arguments="-Project=&quot;$(ProjectFile)&quot; -Platform=$(TargetPlatform) -Configuration=$(BuildConfiguration) -SkipBuild -SkipCook -SkipStage -SkipPak -Package -NoCodeSign" />
     </Node>
@@ -83,20 +82,20 @@
 
   <Agent Name="Test Agent" Type="Win64">
 
-  <Node Name="RunAutomationTests" Requires="BuildEditor;#EditorBinaries">
-    <Log Message="Running automation tests: $(AutomationTests)" />
-    <ForEach Name="TestGroup" Values="$(AutomationTests)" Separator=";">
-      <Log Message="Running test group: $(TestGroup)" />
-    </ForEach>
-    <Log Message="Automation tests complete" />
-  </Node>
-
-    <Node Name="RunGauntletTests" Requires="BuildGame;#GameBinaries">
-      <Log Message="Running Gauntlet tests..." />
-      <Log Message="PLACEHOLDER" />
+    <Node Name="RunAutomationTests" Requires="BuildEditor" If="$(EnableTests)" Produces="#AutomationReports">
+      <Log Message="Running automation tests: $(AutomationTests)" />
+      <Spawn Exe="$(RootDir)\Engine\Binaries\Win64\UnrealEditor-Cmd.exe"
+            Arguments="&quot;$(ProjectFile)&quot; -Unattended -NullRHI -NoSound
+            -ReportExportPath=&quot;$(AutomationOutDir)&quot;
+            -abslog=&quot;$(AutomationOutDir)\Automation.log&quot;
+            -TestExit=&quot;Automation Test Queue Empty&quot;
+            -ExecCmds=&quot;Automation RunTest $(AutomationTests); Quit&quot;
+            -LogCmds=&quot;LogAutomationController Verbose&quot;" />
+      <Tag Files="$(AutomationOutDir)\..." With="#AutomationReports" />
+      <Log Message="Automation tests complete" />
     </Node>
 
-    <Node Name="TestBlueprintCompilation" Requires="BuildEditor;#EditorBinaries">
+    <Node Name="TestBlueprintCompilation" Requires="BuildEditor" If="$(EnableTests)">
       <Log Message="Testing Blueprint compilation..." />
       <Commandlet Name="CompileAllBlueprints" Project="$(ProjectFile)" />
       <Log Message="Blueprint compilation test complete!" />
@@ -104,56 +103,49 @@
   </Agent>
 
   <Agent Name="Analysis Agent" Type="Win64">
-
     <Node Name="RunCodeAnalysis" Requires="GenerateProjectFiles">
-      <Log Message="Running static code analysis..." />
-      
-      <Compile Target="$(ProjectName)Editor" 
-               Platform="Win64" 
-               Configuration="$(BuildConfiguration)" 
-               Project="$(ProjectFile)"
-               Arguments="-StaticAnalyzer=Default -NoPCH -NoSharedPCH -DisableUnity -NoLink -ProjectOnly" />
-      
+      <Log Message="Running static code analysis (project modules only)..." />
+      <Compile Target="$(ProjectName)Editor"
+              Platform="Win64"
+              Configuration="$(BuildConfiguration)"
+              Project="$(ProjectFile)"
+              Arguments="-StaticAnalyzer=Default -NoPCH -NoSharedPCH -DisableUnity -NoLink -ProjectOnly -Module=$(ProjectName)" />
       <Log Message="Static code analysis complete!" />
     </Node>
 
-    <Node Name="ValidateAssets" Requires="BuildEditor;#EditorBinaries">
+    <Node Name="ValidateAssets" Requires="BuildEditor">
       <Log Message="Validating project assets..." />
-      <Commandlet Name="DataValidation" Project="$(ProjectFile)" />
+      <Command Name="DataValidation" Arguments="-Project=&quot;$(ProjectFile)&quot; -Unattended" />
       <Log Message="Asset validation complete!" />
     </Node>
   </Agent>
 
-  <!-- Build-only pipeline -->
+  <!-- Define what runs for each target -->
   <Property Name="BuildNodes" Value="GenerateProjectFiles" />
   <Property Name="BuildNodes" Value="$(BuildNodes);BuildEditor" If="$(EnableEditor)" />
   <Property Name="BuildNodes" Value="$(BuildNodes);BuildGame" If="$(EnableGameBuild)" />
   
-  <!-- Full pipeline with cooking and packaging -->
   <Property Name="PackageNodes" Value="$(BuildNodes)" />
   <Property Name="PackageNodes" Value="$(PackageNodes);CookContent" If="$(EnableCook)" />
   <Property Name="PackageNodes" Value="$(PackageNodes);StageProject;PackageProject" If="$(EnablePackage)" />
   
-  <!-- Test pipeline -->
-  <Property Name="TestNodes" Value="RunAutomationTests;RunGauntletTests;TestBlueprintCompilation" If="$(EnableTests)" />
-  
-  <!-- Analysis pipeline -->
-  <Property Name="AnalysisNodes" Value="RunCodeAnalysis;ValidateAssets" If="$(EnableLinting)" />
-  
-  <!-- Full CI/CD pipeline -->
-  <Property Name="AllNodes" Value="$(PackageNodes)" />
-  <Property Name="AllNodes" Value="$(AllNodes);$(TestNodes)" If="$(EnableTests)" />
-  <Property Name="AllNodes" Value="$(AllNodes);$(AnalysisNodes)" If="$(EnableLinting)" />
+  <Property Name="TestNodes" Value="" />
+  <Property Name="TestNodes" Value="RunAutomationTests;TestBlueprintCompilation" If="$(EnableTests)" />
 
-  <!-- Individual targets -->
+  <Property Name="AnalysisNodes" Value="" />
+  <Property Name="AnalysisNodes" Value="RunCodeAnalysis;ValidateAssets" />
+
+  <!-- Target definitions -->
   <Aggregate Name="Build" Requires="$(BuildNodes)" />
   <Aggregate Name="Package" Requires="$(PackageNodes)" />
-  <Aggregate Name="Test" Requires="$(TestNodes)" />
-  <Aggregate Name="Analyze" Requires="$(AnalysisNodes)" />
+  <Aggregate Name="Test" Requires="$(TestNodes)" If="'$(TestNodes)' != ''" />
+  <Aggregate Name="Analyze" Requires="$(AnalysisNodes)" If="'$(AnalysisNodes)' != ''" />
   
-  <!-- Main CI/CD target -->
-  <Aggregate Name="CI" Requires="$(AllNodes)" />
+  <!-- Full CI target combines everything -->
+  <Property Name="CINodes" Value="$(PackageNodes)" />
+  <Property Name="CINodes" Value="$(CINodes);$(TestNodes)" If="$(EnableTests) And '$(TestNodes)' != ''" />
+  <Property Name="CINodes" Value="$(CINodes);$(AnalysisNodes)" If="'$(AnalysisNodes)' != ''" />
   
-  <!-- Default target when no specific target is specified -->
+  <Aggregate Name="CI" Requires="$(CINodes)" />
   <Aggregate Name="Default" Requires="CI" />
 </BuildGraph>

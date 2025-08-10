@@ -1,0 +1,8 @@
+F:\UnrealEngine-5.5\UnrealEngine-5.5\Engine\Build\BatchFiles\RunUAT.bat BuildGraph ^
+  -Script="F:\UNREAL\ATTEMPT2BECAUSEUNREALISASHITPROGRAM\FPSProject\BuildScripts\Build.xml" ^
+  -Target=CI ^
+  -set:ProjectName=FPSProject ^
+  -set:ProjectRoot=F:\UNREAL\ATTEMPT2BECAUSEUNREALISASHITPROGRAM\FPSProject ^
+  -set:BuildConfiguration=Development ^
+  -set:TargetPlatform=Win64 ^
+  -set:AutomationTests="Game.FPSCharacter.Health"
