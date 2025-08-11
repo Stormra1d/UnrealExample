@@ -39,7 +39,7 @@
       <Compile Target="$(ProjectName)Editor" 
                Platform="Win64"
                Configuration="$(BuildConfiguration)"
-               Arguments="-ProjectOnly"
+               Arguments="-ProjectOnly -NoEngineChanges -NoHotReloadFromIDE"
                Project="$(ProjectFile)"
                Tag="#EditorBinaries" />
       <Log Message="Editor build complete" />
@@ -51,7 +51,7 @@
       <Compile Target="$(ProjectName)" 
                Platform="$(TargetPlatform)"
                Configuration="$(BuildConfiguration)" 
-               Arguments="-ProjectOnly"
+               Arguments="-ProjectOnly -NoEngineChanges -NoHotReloadFromIDE"
                Project="$(ProjectFile)"
                Tag="#GameBinaries" />
       <Log Message="Game build complete" />
@@ -109,7 +109,7 @@
               Platform="Win64"
               Configuration="$(BuildConfiguration)"
               Project="$(ProjectFile)"
-              Arguments="-StaticAnalyzer=Default -NoPCH -NoSharedPCH -DisableUnity -NoLink -ProjectOnly -Module=$(ProjectName)" />
+              Arguments="-StaticAnalyzer=Default -NoPCH -NoSharedPCH -DisableUnity -NoLink -ProjectOnly -NoEngineChanges -NoHotReloadFromIDE -Module=$(ProjectName)" />
       <Log Message="Static code analysis complete!" />
     </Node>
 

@@ -1,8 +1,25 @@
-F:\UnrealEngine-5.5\UnrealEngine-5.5\Engine\Build\BatchFiles\RunUAT.bat BuildGraph ^
+D:\UE5.5-Compiled-Backup\UnrealEngine-5.5\Engine\Build\BatchFiles\RunUAT.bat BuildGraph ^
   -Script="F:\UNREAL\ATTEMPT2BECAUSEUNREALISASHITPROGRAM\FPSProject\BuildScripts\Build.xml" ^
   -Target=CI ^
   -set:ProjectName=FPSProject ^
-  -set:ProjectRoot=F:\UNREAL\ATTEMPT2BECAUSEUNREALISASHITPROGRAM\FPSProject ^
+  -set:ProjectRoot="F:\UNREAL\ATTEMPT2BECAUSEUNREALISASHITPROGRAM\FPSProject" ^
   -set:BuildConfiguration=Development ^
   -set:TargetPlatform=Win64 ^
+  -set:EnableTests=true ^
+  -set:EnablePackage=true ^
+  -set:EnableLinting=true ^
   -set:AutomationTests="Game.FPSCharacter.Health"
+
+Run anywhere to run XML
+
+
+
+
+Engine\Build\BatchFiles\RunUAT.bat BuildGraph ^
+  -Script=Engine/Build/InstalledEngineBuild.xml ^
+  -Target="Make Installed Build Win64" ^
+  -set:GameTargetPlatforms=Win64 ^
+  -set:HostPlatformOnly=true ^
+  -set:VSVersion=2022
+
+RUN IN D:\UE5.5-Compiled-Backup\UnrealEngine-5.5 => Hopefully installs build
