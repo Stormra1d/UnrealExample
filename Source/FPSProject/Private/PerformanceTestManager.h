@@ -32,46 +32,46 @@ struct FPerformanceTestConfig {
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	FString Name;
+	FString Name = "Test";
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	EPerformanceTestType TestType;
+	EPerformanceTestType TestType = EPerformanceTestType::Stress;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "TestType == EPerformanceTestType::Load"))
-	ELoadTestSubType LoadTestSubType;
+	ELoadTestSubType LoadTestSubType = ELoadTestSubType::Incremental;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "TestType == EPerformanceTestType::Soak"))
-	EEnduranceTestSubType EnduranceTestSubType;
+	EEnduranceTestSubType EnduranceTestSubType = EEnduranceTestSubType::General;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "TestType == EPerformanceTestType::Spike"))
-	ESpikeTestSubType SpikeTestSubType;
+	ESpikeTestSubType SpikeTestSubType = ESpikeTestSubType::Negative;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 NumEnemies;
+	int32 NumEnemies = 10;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 NumPickups;
+	int32 NumPickups = 10;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 NumCollectibles;
+	int32 NumCollectibles = 10;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	int32 NumProjectiles;
+	int32 NumProjectiles = 10;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "TestType == EPerformanceTestType::Spike"))
-	int32 SpikeSize;
+	int32 SpikeSize = 10;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "TestType == EPerformanceTestType::Spike"))
-	int32 NumSpikes; 
+	int32 NumSpikes = 3; 
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float SpawnInterval;
+	float SpawnInterval = 0.1f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, meta = (EditCondition = "TestType == EPerformanceTestType::Spike"))
-	float SpikeInterval;
+	float SpikeInterval = 0.1f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	float HoldDuration;
+	float HoldDuration = 5.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float TestDuration = 60.0f;
