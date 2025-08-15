@@ -8,13 +8,17 @@ public class FPSProject : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "NavigationSystem", "UMG", "Slate", "SlateCore", "AutomationDriver", "ApplicationCore", "ToolMenus", "Json", "JsonUtilities" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "NavigationSystem", "UMG", "Slate", "SlateCore", "ApplicationCore", "ToolMenus", "Json", "JsonUtilities" });
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "AutomationDriverTests", "ToolMenus", "Slate", "SlateCore", "AutomationDriverTests" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "ToolMenus", "Slate", "SlateCore" });
 
 		if (Target.bBuildEditor)
 		{
-			PrivateDependencyModuleNames.Add("UnrealEd");
+			PrivateDependencyModuleNames.AddRange(new[] {
+			"UnrealEd",
+			"AutomationDriver",
+			"AutomationDriverTests"
+			});
 		}
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
