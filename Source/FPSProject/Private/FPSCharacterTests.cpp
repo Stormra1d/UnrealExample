@@ -7,7 +7,7 @@
 #include "FPSProject/WeaponPickup.h"
 #include <Tests/AutomationCommon.h>
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterHealthTest, "Game.FPSCharacter.Health", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterHealthTest, "Game.FPSCharacter.Unit.Health", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FPSCharacterHealthTest::RunTest(const FString& Parameters) {
 	ADD_LATENT_AUTOMATION_COMMAND(FOpenMapLatentCommand(TEXT("/Game/Tests/MinimalTestMap")));
@@ -32,7 +32,7 @@ bool FPSCharacterHealthTest::RunTest(const FString& Parameters) {
 	return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterHealthPickupTest, "Game.FPSCharacter.HealthPickup", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterHealthPickupTest, "Game.FPSCharacter.Unit.HealthPickup", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FPSCharacterHealthPickupTest::RunTest(const FString& Parameters) {
     TWeakObjectPtr<AFPSCharacter> Player = nullptr;
@@ -82,7 +82,7 @@ bool FPSCharacterHealthPickupTest::RunTest(const FString& Parameters) {
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterWeaponPickupTest, "Game.FPSCharacter.WeaponPickup", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterWeaponPickupTest, "Game.FPSCharacter.Unit.WeaponPickup", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FPSCharacterWeaponPickupTest::RunTest(const FString& Parameters) {
     TWeakObjectPtr<AFPSCharacter> Player = nullptr;
@@ -133,7 +133,7 @@ bool FPSCharacterWeaponPickupTest::RunTest(const FString& Parameters) {
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterCollectibleAchievementTest, "Game.FPSCharacter.CollectibleAchievement", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterCollectibleAchievementTest, "Game.FPSCharacter.Unit.CollectibleAchievement", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FPSCharacterCollectibleAchievementTest::RunTest(const FString& Parameters) {
     TWeakObjectPtr<AFPSCharacter> Player = nullptr;
@@ -168,7 +168,7 @@ bool FPSCharacterCollectibleAchievementTest::RunTest(const FString& Parameters) 
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterSprintTest, "Game.FPSCharacter.SprintSpeed", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPSCharacterSprintTest, "Game.FPSCharacter.Unit.SprintSpeed", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FPSCharacterSprintTest::RunTest(const FString& Parameters) {
     TWeakObjectPtr<AFPSCharacter> Player = nullptr;

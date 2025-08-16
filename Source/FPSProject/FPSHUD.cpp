@@ -14,14 +14,14 @@ void AFPSHUD::DrawHUD() {
 	Super::DrawHUD();
 
 	// Crosshair
-	if (CrosshairTexture) {
-		FVector2D Center(Canvas->ClipX * 0.5f, Canvas->ClipY * 0.5f);
+	if (CrosshairTexture && Canvas) {
+		const FVector2D Center(Canvas->ClipX * 0.5f, Canvas->ClipY * 0.5f);
 
-		FVector2D CrossHairDrawPosition(Center.X - (CrosshairTexture->GetSurfaceWidth() * 0.5f), Center.Y - (CrosshairTexture->GetSurfaceHeight() * 0.5f));
+		const FCanvasIcon Icon = UCanvas::MakeIcon(CrosshairTexture);
+		const float X = Center.X - (Icon.UL * 0.5f);
+		const float Y = Center.Y - (Icon.VL * 0.5f);
 
-		FCanvasTileItem TileItem(CrossHairDrawPosition, CrosshairTexture->GetResource(), FLinearColor::White);
-		TileItem.BlendMode = SE_BLEND_Translucent;
-		Canvas->DrawItem(TileItem);
+		Canvas->DrawIcon(Icon, X, Y);
 	}
 
 	// Health

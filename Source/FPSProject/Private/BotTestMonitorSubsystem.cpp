@@ -12,7 +12,7 @@ void UBotTestMonitorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
     Super::Initialize(Collection);
 
-    bIsAIPlaytest = FParse::Param(FCommandLine::Get(), TEXT("-AITest"));
+    bIsAIPlaytest = FParse::Param(FCommandLine::Get(), TEXT("AITest"));
     if (!bIsAIPlaytest) {
         UE_LOG(LogTemp, Warning, TEXT("Subsystem: Not an AI Playtest, disabling"));
         return;
@@ -27,7 +27,7 @@ void UBotTestMonitorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
         FTickerDelegate::CreateUObject(this, &UBotTestMonitorSubsystem::Tick)
     );
 
-    StartTest(); // You can do this here if you always want to test when game starts
+    StartTest();
 }
 
 void UBotTestMonitorSubsystem::Deinitialize()

@@ -7,6 +7,7 @@
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
 #include "FPSEnemyBase.h"
 
 // Sets default values
@@ -41,18 +42,27 @@ AFPSProjectile::AFPSProjectile()
 	if (!ProjectileMeshComponent)
 	{
 		ProjectileMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("ProjectileMeshComponent"));
-		static ConstructorHelpers::FObjectFinder<UStaticMesh>Mesh(TEXT("/Script/Engine.StaticMesh'/Game/Static/Bullet.Bullet'"));
-		if (Mesh.Succeeded())
+		static const TCHAR* MeshPath = TEXT("/Game/Static/Bullet.Bullet");
+		if (UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, MeshPath))
 		{
-			ProjectileMeshComponent->SetStaticMesh(Mesh.Object);
+			ProjectileMeshComponent->SetStaticMesh(Mesh);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("AFPSProjectile: Missing mesh at %s"), MeshPath);
 		}
 
-		static ConstructorHelpers::FObjectFinder<UMaterialInterface> Material(TEXT("/Script/Engine.Material'/Game/Static/SphereMaterial.SphereMaterial'"));
-		if (Material.Succeeded()) {
-			ProjectileMaterialInstance = UMaterialInstanceDynamic::Create(Material.Object.Get(), ProjectileMeshComponent);
+		static const TCHAR* MatPath = TEXT("/Game/Static/SphereMaterial.SphereMaterial");
+		if (UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, MatPath))
+		{
+			ProjectileMaterialInstance = UMaterialInstanceDynamic::Create(BaseMat, ProjectileMeshComponent);
+			ProjectileMeshComponent->SetMaterial(0, ProjectileMaterialInstance);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("AFPSProjectile: Missing material at %s"), MatPath);
 		}
 
-		ProjectileMeshComponent->SetMaterial(0, ProjectileMaterialInstance);
 		ProjectileMeshComponent->SetRelativeScale3D(FVector(3.0f, 3.0f, 3.0f));
 		ProjectileMeshComponent->SetupAttachment(RootComponent);
 	}

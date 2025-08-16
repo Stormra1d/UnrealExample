@@ -1,0 +1,9 @@
+#Tests: 7
+Test,MinFPS,MaxFPS,AvgFPS,SampleCount
+SteadyState Load Test,54.06,120.00,104.55,30
+Incremental Load Test,29.28,120.00,101.67,30
+Stress Test,59.73,101.88,73.00,30
+Positive Spike Test,49.80,97.80,84.48,30
+Negative Spike Test,95.55,119.99,110.63,30
+Repeated Spike Test,34.68,111.36,65.20,30
+Soak Endurance Test,18.69,120.00,100.98,600

@@ -24,7 +24,6 @@ void AFPSProjectGameModeBase::StartPlay()
     {
         GEngine->AddOnScreenDebugMessage(-1, 15.0f, FColor::Yellow, TEXT("ENABLED PLAYER AI"));
 
-        // Check if we're in automation test mode
         bool bIsAutomationTest = GIsAutomationTesting;
 
         if (bIsAutomationTest) {
@@ -61,7 +60,6 @@ void AFPSProjectGameModeBase::SetupPlayerAI()
         CachedPlayerCharacter = PlayerCharacter;
         PlayerCharacter->bIsTestMode = true;
 
-        // Check if player is already possessed by AI (in case of level transition)
         APlayerAIController* ExistingAI = Cast<APlayerAIController>(PlayerCharacter->GetController());
         if (ExistingAI)
         {
@@ -118,7 +116,7 @@ void AFPSProjectGameModeBase::SetupPlayerAI()
             GEngine->AddOnScreenDebugMessage(-1, 5.0f, FColor::Green, TEXT("AI setup complete - starting target planning"));
             UE_LOG(LogTemp, Log, TEXT("AI setup complete, starting target updates"));
 
-            GetWorldTimerManager().ClearTimer(TargetUpdateTimerHandle); // Clear existing timer
+            GetWorldTimerManager().ClearTimer(TargetUpdateTimerHandle);
             GetWorldTimerManager().SetTimer(TargetUpdateTimerHandle, this, &AFPSProjectGameModeBase::UpdateBotTarget, 2.0f, true);
         }
         else

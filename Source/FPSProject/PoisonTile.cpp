@@ -10,6 +10,7 @@
 #include "Materials/Material.h"
 #include "Materials/MaterialInterface.h"
 #include "Engine/Engine.h"
+#include "Engine/StaticMesh.h"
 
 // Sets default values
 APoisonTile::APoisonTile()
@@ -25,17 +26,25 @@ APoisonTile::APoisonTile()
 	MeshComponent = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("MeshComponent"));
 	MeshComponent->SetupAttachment(RootComponent);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaneMesh(TEXT("/Engine/BasicShapes/Plane.Plane"));
-	if (PlaneMesh.Succeeded()) {
-		MeshComponent->SetStaticMesh(PlaneMesh.Object.Get());
+	if (UStaticMesh* Plane = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Plane.Plane")))
+	{
+		MeshComponent->SetStaticMesh(Plane);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Missing plane mesh /Engine/BasicShapes/Plane.Plane"));
 	}
 
 	MeshComponent->SetRelativeScale3D(FVector(4.0f, 4.0f, 1.0f));
 	MeshComponent->SetRelativeLocation(FVector(0.0f, 0.04, -50.0f));
 
-	static ConstructorHelpers::FObjectFinder<UMaterialInterface> GreenMat(TEXT("/Game/Static/M_Green.M_Green"));
-	if (GreenMat.Succeeded()) {
-		MeshComponent->SetMaterial(0, GreenMat.Object.Get());
+	if (UMaterialInterface* Green = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/Static/M_Green.M_Green")))
+	{
+		MeshComponent->SetMaterial(0, Green);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Missing material /Game/Static/M_Green.M_Green"));
 	}
 
 	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
