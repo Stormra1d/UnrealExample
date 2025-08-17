@@ -35,6 +35,11 @@ on:
         required: true
         default: true
         type: boolean
+      build_script_path:
+        description: 'Override path to Build.xml (optional)'
+        required: false
+        default: ''
+        type: string
 
 env:
   PROJECT_NAME: FPSProject
@@ -123,62 +128,102 @@ jobs:
     
       # Run BuildGraph
       - name: Run BuildGraph CI Pipeline
+        shell: powershell
         run: |
           Write-Host "Starting BuildGraph CI/CD Pipeline..."
           Write-Host "Using PRECOMPILED engine from: $env:UE_ENGINE_PATH"
-
-          $UEPath = $env:UE_ENGINE_PATH
-          
-          $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
-          $ProjectRoot = $PWD.Path
-          $BuildScript = "$ProjectRoot\BuildScripts\Build.xml"
-          
-          Write-Host "UE Path: $UEPath"
-          Write-Host "Project Root: $ProjectRoot"
-          Write-Host "Build Script: $BuildScript"
-
-          if (!(Test-Path $BuildScript)) {
-            Write-Error "Build script not found at: $BuildScript"
-            Write-Host "Creating BuildScripts directory and checking project structure..."
-            
-            if (!(Test-Path "$ProjectRoot\BuildScripts")) {
-              New-Item -ItemType Directory -Path "$ProjectRoot\BuildScripts" -Force
+      
+          $UEPath      = $env:UE_ENGINE_PATH
+          $RunUATPath  = Join-Path $UEPath 'Engine\Build\BatchFiles\RunUAT.bat'
+          $RepoRoot    = $PWD.Path
+      
+          if (!(Test-Path $RunUATPath)) { 
+            Write-Error "RunUAT.bat not found: $RunUATPath"; exit 1 
+          }
+      
+          if (-not $env:PROJECT_ROOT -or -not (Test-Path $env:PROJECT_ROOT)) {
+            $uprojects = Get-ChildItem -Path $RepoRoot -Filter *.uproject -File -Recurse | Select-Object -First 2
+            if ($uprojects.Count -eq 0) {
+              Write-Error "No .uproject found under $RepoRoot. Set env PROJECT_ROOT or add the project."
+              exit 1
             }
             
-            Write-Host "Project files in root:"
-            Get-ChildItem -Path $ProjectRoot -Filter "*.*" | Select-Object Name, LastWriteTime | ForEach-Object { Write-Host "  $($_.Name)" }
+            if ($uprojects.Count -gt 1) {
+              Write-Host "Multiple .uproject files found:"
+              $uprojects | ForEach-Object { Write-Host " - $($_.FullName)" }
+              Write-Error "Ambiguous project."
+              exit 1
+            }
+            
+            $UProjectPath = $uprojects[0].FullName
+            $ProjectRoot  = Split-Path -Parent $UProjectPath
+          } else {
+            $ProjectRoot  = $env:PROJECT_ROOT
+            $uprojects = Get-ChildItem -Path $ProjectRoot -Filter *.uproject -File
+            if ($uprojects.Count -ne 1) {
+              Write-Error "Expected exactly one .uproject in PROJECT_ROOT '$ProjectRoot', found $($uprojects.Count)."
+              exit 1
+            }
+            $UProjectPath = $uprojects[0].FullName
+          }
+      
+          $ProjectName  = [IO.Path]::GetFileNameWithoutExtension($UProjectPath)
+      
+          $InputBuildScript = "${{ github.event.inputs.build_script_path }}"
+          if ([string]::IsNullOrWhiteSpace($InputBuildScript)) {
+            $BuildScript = Join-Path $ProjectRoot 'BuildScripts\Build.xml'
+          } else {
+            $BuildScript = $InputBuildScript
+            if (-not [IO.Path]::IsPathRooted($BuildScript)) {
+              $BuildScript = Join-Path $RepoRoot $BuildScript
+            }
+          }
+          if (!(Test-Path $BuildScript)) {
+            Write-Error "Build script not found at: $BuildScript"
             exit 1
           }
-          
-          # Build the BuildGraph command - uses your precompiled engine
+      
+          $EnableTests     = "${{ github.event.inputs.enable_tests || 'true' }}"
+          $EnablePackage   = "${{ github.event.inputs.enable_packaging || 'true' }}"
+          $BuildConfig     = $env:BUILD_CONFIGURATION
+          $TargetPlatform  = $env:TARGET_PLATFORM
+      
+          $AutomationTests = "${{ github.event.inputs.automation_tests }}"
+          if ([string]::IsNullOrWhiteSpace($AutomationTests)) {
+            if ("${{ github.event_name }}" -eq "pull_request") {
+              $AutomationTests = "Group:System;Group:Smoke"
+            } elseif ("${{ github.ref }}" -eq "refs/heads/main") {
+              $AutomationTests = "Group:System;Group:Smoke;Group:Performance"
+            } else {
+              $AutomationTests = ""
+            }
+          }
+      
+          Write-Host "UE Path: $UEPath"
+          Write-Host "Repo Root: $RepoRoot"
+          Write-Host "Project Root: $ProjectRoot"
+          Write-Host "Project Name: $ProjectName"
+          Write-Host "UProject: $UProjectPath"
+          Write-Host "Build Script: $BuildScript"
+          if ($AutomationTests) { Write-Host "AutomationTests: $AutomationTests" } else { Write-Host "AutomationTests: <not set>" }
+      
           $BuildGraphArgs = @(
             "BuildGraph"
             "-Script=`"$BuildScript`""
-            "-Target=CI"  # Run the CI pipeline (build + test + analyze + package)
-            "-set:ProjectName=$env:PROJECT_NAME"
+            "-Target=CI"
+            "-set:ProjectName=$ProjectName"
             "-set:ProjectRoot=`"$ProjectRoot`""
-            "-set:BuildConfiguration=$env:BUILD_CONFIGURATION"
-            "-set:TargetPlatform=$env:TARGET_PLATFORM"
-            "-set:EnableTests=${{ github.event.inputs.enable_tests || 'true' }}"
-            "-set:EnablePackage=${{ github.event.inputs.enable_packaging || 'true' }}"
+            "-set:BuildConfiguration=$BuildConfig"
+            "-set:TargetPlatform=$TargetPlatform"
+            "-set:EnableTests=$EnableTests"
+            "-set:EnablePackage=$EnablePackage"
             "-set:EnableLinting=true"
           )
-          
-          if ("${{ github.event_name }}" -eq "pull_request") {
-            $BuildGraphArgs += "-set:AutomationTests=Group:System;Group:Smoke"
-          } elseif ("${{ github.ref }}" -eq "refs/heads/main") {
-            $BuildGraphArgs += "-set:AutomationTests=Group:System;Group:Smoke;Group:Performance"
-          }
-          
-          # Execute BuildGraph
+      
           Write-Host "Executing: $RunUATPath $($BuildGraphArgs -join ' ')"
-          Write-Host "This will compile your PROJECT code only, using the precompiled engine!"
-          
           & $RunUATPath @BuildGraphArgs
-          
           if ($LASTEXITCODE -ne 0) {
             Write-Error "BuildGraph failed with exit code $LASTEXITCODE"
-
             if (Test-Path "Saved\Logs") {
               Write-Host "Recent log files:"
               Get-ChildItem "Saved\Logs" -Filter "*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {
@@ -186,12 +231,9 @@ jobs:
                 Get-Content $_.FullName -Tail 50
               }
             }
-
             exit $LASTEXITCODE
           }
-          
           Write-Host "BuildGraph pipeline completed successfully!"
-        shell: powershell
       
       # Upload Artifacts
       - name: Upload Build Logs
