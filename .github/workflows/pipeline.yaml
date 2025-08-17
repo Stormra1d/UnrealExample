@@ -39,7 +39,7 @@ on:
 env:
   PROJECT_NAME: FPSProject
   UE_VERSION: "5.5"
-  UE_ENGINE_PATH: "D:\\UnrealEngine-5.5\\UnrealEngine-5.5"
+  UE_ENGINE_PATH: "F:\\UE5.5-Installed"
   BUILD_CONFIGURATION: ${{ github.event.inputs.build_configuration || 'Development' }}
   TARGET_PLATFORM: ${{ github.event.inputs.target_platform || 'Win64' }}
 
