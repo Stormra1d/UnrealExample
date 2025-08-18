@@ -110,6 +110,7 @@
         -build=editor
         -reportdir=&quot;$(AutomationOutDir)\Editor\Gauntlet&quot;
         -ReportExportPath=&quot;$(AutomationOutDir)\Editor\Automation&quot;
+        -reportexporters=xml
         -timeout=18000
         -maxtestduration=18000
         -MaxDuration=18000
@@ -156,7 +157,9 @@
         -test=UE.TargetAutomation
         -runtest=Group:Func
         -build=local
-        -reportdir=&quot;$(AutomationOutDir)\Client\Func&quot;"/>
+        -reportdir=&quot;$(AutomationOutDir)\Client\Func&quot;
+        -ReportExportPath=&quot;$(AutomationOutDir)\Editor\Automation&quot;
+        -reportexporters=xml" />
     </Node>
 
     <Node Name="RunClientTests_AI" Requires="StageProject" If="$(EnableTests)">
@@ -171,6 +174,8 @@
         -build=local
         -reportdir=&quot;$(AutomationOutDir)\Client\AI\Gauntlet&quot;
         -ReportExportPath=&quot;$(AutomationOutDir)\Client\AI\Automation&quot;
+        -ReportExportPath=&quot;$(AutomationOutDir)\Editor\Automation&quot;
+        -reportexporters=xml
         -timeout=18000
         -maxtestduration=18000
         -MaxDuration=18000
