@@ -10,15 +10,44 @@
   <Error Message="ProjectName must be specified via -set:ProjectName=..." If="'$(ProjectName)' == ''" />
   <Error Message="ProjectRoot must be specified via -set:ProjectRoot=..." If="'$(ProjectRoot)' == ''" />
 
-  <Option Name="BuildConfiguration" DefaultValue="Development" Restrict="Debug|Development|Shipping|Test" />
-  <Option Name="TargetPlatform" DefaultValue="Win64" Restrict="Win64|Linux|Mac" />
-  <Option Name="EnableEditor" DefaultValue="true" Restrict="true|false" />
-  <Option Name="EnableGameBuild" DefaultValue="true" Restrict="true|false" />
-  <Option Name="EnableCook" DefaultValue="true" Restrict="true|false" />
-  <Option Name="EnablePackage" DefaultValue="true" Restrict="true|false" />
-  <Option Name="EnableTests" DefaultValue="true" Restrict="true|false" />
-  <Option Name="ForceEngineRebuild" DefaultValue="false" Restrict="true|false" />
-  <Option Name="AutomationTests" DefaultValue="Game.FPSCharacter.*" />
+  <Option Name="ProjectName" DefaultValue="" Description="Name of the project" />
+  <Option Name="ProjectRoot" DefaultValue="" Description="Root directory of the project" />
+
+  <Property Name="ProjectFile" Value="$(ProjectRoot)\$(ProjectName).uproject" />
+  <Property Name="BuildOutputDir" Value="$(ProjectRoot)\Saved\StagedBuilds" />
+  <Property Name="AutomationOutDir" Value="$(ProjectRoot)\Saved\Automation" />
+
+  <Error Message="Project file $(ProjectFile) does not exist" If="!Exists('$(ProjectFile)')" />
+  <Error Message="ProjectName must be specified via -set:ProjectName=..." If="'$(ProjectName)' == ''" />
+  <Error Message="ProjectRoot must be specified via -set:ProjectRoot=..." If="'$(ProjectRoot)' == ''" />
+
+  <Option Name="BuildConfiguration" DefaultValue="Development"
+          Restrict="Debug|Development|Shipping|Test"
+          Description="Build configuration" />
+  <Option Name="TargetPlatform" DefaultValue="Win64"
+          Restrict="Win64|Linux|Mac"
+          Description="Target platform" />
+  <Option Name="EnableEditor" DefaultValue="true"
+          Restrict="true|false"
+          Description="Build the editor" />
+  <Option Name="EnableGameBuild" DefaultValue="true"
+          Restrict="true|false"
+          Description="Build the game target" />
+  <Option Name="EnableCook" DefaultValue="true"
+          Restrict="true|false"
+          Description="Cook content" />
+  <Option Name="EnablePackage" DefaultValue="true"
+          Restrict="true|false"
+          Description="Package the build" />
+  <Option Name="EnableTests" DefaultValue="true"
+          Restrict="true|false"
+          Description="Run automated tests" />
+  <Option Name="ForceEngineRebuild" DefaultValue="false"
+          Restrict="true|false"
+          Description="Force rebuild engine modules" />
+  <Option Name="AutomationTests" DefaultValue="Game.FPSCharacter.*"
+          Description="Automation test filter pattern" />
+
 
   <Agent Name="Build Agent" Type="Win64">
     <Node Name="GenerateProjectFiles">
