@@ -93,8 +93,21 @@ jobs:
           $ProjectName = [IO.Path]::GetFileNameWithoutExtension((Get-ChildItem $ProjectRoot -Filter *.uproject -File).FullName)
 
           $InputBuildScript = "${{ github.event.inputs.build_script_path }}"
-          if ([string]::IsNullOrWhiteSpace($InputBuildScript)) { $BuildScript = Join-Path $ProjectRoot 'BuildScripts\Build.xml' } else { $BuildScript = (Split-Path -IsAbsolute $InputBuildScript) ? $InputBuildScript : (Join-Path $RepoRoot $InputBuildScript) }
-          if (!(Test-Path $BuildScript)) { Write-Error "Build script not found: $BuildScript"; exit 1 }
+
+          if ([string]::IsNullOrWhiteSpace($InputBuildScript)) {
+            $BuildScript = Join-Path $ProjectRoot 'BuildScripts\Build.xml'
+          } else {
+            if ([IO.Path]::IsPathRooted($InputBuildScript)) {
+              $BuildScript = $InputBuildScript
+            } else {
+              $BuildScript = Join-Path $RepoRoot $InputBuildScript
+            }
+          }
+
+          if (!(Test-Path $BuildScript)) {
+            Write-Error "Build script not found at: $BuildScript"
+            exit 1
+          }
 
           $args = @(
             "BuildGraph",
