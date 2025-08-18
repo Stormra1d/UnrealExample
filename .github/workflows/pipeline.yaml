@@ -12,19 +12,13 @@ on:
         required: true
         default: 'Development'
         type: choice
-        options:
-        - Development
-        - Shipping
-        - Debug
-        - Test
+        options: [Development, Shipping, Debug, Test]
       target_platform:
         description: 'Target Platform'
         required: true
         default: 'Win64'
         type: choice
-        options:
-        - Win64
-        - Linux
+        options: [Win64, Linux]
       enable_tests:
         description: 'Run Tests'
         required: true
@@ -52,228 +46,172 @@ jobs:
   build-and-test:
     name: Build, Cook, Package & Test
     runs-on: [self-hosted, windows]
-    
     timeout-minutes: 120
-    
+
     steps:
-      # Checkout with LFS
-      - name: Checkout code
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
-      
-      # Verify precompiled engine exists
+
       - name: Verify Precompiled Engine
+        shell: powershell
         run: |
-          Write-Host "Checking for precompiled Unreal Engine..."
-          
           $UEPath = $env:UE_ENGINE_PATH
-          $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
-          $EditorPath = "$UEPath\Engine\Binaries\Win64\UnrealEditor.exe"
-          $UBTPath = "$UEPath\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe"
-          
-          Write-Host "UE Engine Path: $UEPath"
-          
-          if (!(Test-Path $UEPath)) {
-            Write-Error "Precompiled engine not found at: $UEPath"
-            Write-Host "Available directories in D:\:"
-            Get-ChildItem -Path "D:\" -Directory | ForEach-Object { Write-Host "  - $($_.Name)" }
-            exit 1
-          }
-          
-          if (!(Test-Path $RunUATPath)) {
-            Write-Error "RunUAT.bat not found at: $RunUATPath"
-            exit 1
-          }
-          
-          if (!(Test-Path $EditorPath)) {
-            Write-Error "UnrealEditor.exe not found at: $EditorPath"
-            exit 1
-          }
-          
-          if (!(Test-Path $UBTPath)) {
-            Write-Error "UnrealBuildTool.exe not found at: $UBTPath"
-            exit 1
-          }
-          
-          Write-Host "Precompiled engine verified successfully!"
-          Write-Host "This will use your precompiled engine, NOT compile the engine from scratch"
+          if (!(Test-Path "$UEPath\Engine\Build\BatchFiles\RunUAT.bat")) { Write-Error "RunUAT missing"; exit 1 }
+          if (!(Test-Path "$UEPath\Engine\Binaries\Win64\UnrealEditor.exe")) { Write-Error "UnrealEditor.exe missing"; exit 1 }
+          if (!(Test-Path "$UEPath\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe")) { Write-Error "UBT missing"; exit 1 }
+
+      - name: Clean previous outputs
         shell: powershell
-  
-      # Workspace Prep & Clean
-      - name: Clean previous build outputs
         run: |
-          Write-Host "Cleaning previous build outputs..."
-          
-          # Clean common build directories
-          $DirsToClean = @(
-            "Binaries", 
-            "Intermediate", 
-            "Saved/StagedBuilds", 
-            "Saved/Cooked",
-            "Saved/Automation",
-            "Saved/Logs"
-          )
-          
-          foreach ($Dir in $DirsToClean) {
-            if (Test-Path $Dir) {
-              Write-Host "Removing $Dir"
-              Remove-Item -Recurse -Force $Dir -ErrorAction SilentlyContinue
-            }
-          }
-          
-          Write-Host "Workspace cleaned!"
-        shell: powershell
-    
-      # Run BuildGraph
+          @("Binaries","Intermediate","Saved/StagedBuilds","Saved/Cooked","Saved/Automation","Saved/Logs") |
+            % { if (Test-Path $_) { Remove-Item -Recurse -Force $_ } }
+
       - name: Run BuildGraph CI Pipeline
         shell: powershell
         run: |
-          Write-Host "Starting BuildGraph CI/CD Pipeline..."
-          Write-Host "Using PRECOMPILED engine from: $env:UE_ENGINE_PATH"
-      
-          $UEPath      = $env:UE_ENGINE_PATH
-          $RunUATPath  = Join-Path $UEPath 'Engine\Build\BatchFiles\RunUAT.bat'
-          $RepoRoot    = $PWD.Path
-      
-          if (!(Test-Path $RunUATPath)) { 
-            Write-Error "RunUAT.bat not found: $RunUATPath"; exit 1 
-          }
-      
+          $UEPath     = $env:UE_ENGINE_PATH
+          $RunUATPath = Join-Path $UEPath 'Engine\Build\BatchFiles\RunUAT.bat'
+          $RepoRoot   = $PWD.Path
+
           if (-not $env:PROJECT_ROOT -or -not (Test-Path $env:PROJECT_ROOT)) {
-            $uprojects = Get-ChildItem -Path $RepoRoot -Filter *.uproject -File -Recurse | Select-Object -First 2
-            if ($uprojects.Count -eq 0) {
-              Write-Error "No .uproject found under $RepoRoot. Set env PROJECT_ROOT or add the project."
-              exit 1
-            }
-            
-            if ($uprojects.Count -gt 1) {
-              Write-Host "Multiple .uproject files found:"
-              $uprojects | ForEach-Object { Write-Host " - $($_.FullName)" }
-              Write-Error "Ambiguous project."
-              exit 1
-            }
-            
-            $UProjectPath = $uprojects[0].FullName
+            $uproject = Get-ChildItem -Path $RepoRoot -Filter *.uproject -File -Recurse | Select-Object -First 1
+            if (!$uproject) { Write-Error "No .uproject found"; exit 1 }
+            $UProjectPath = $uproject.FullName
             $ProjectRoot  = Split-Path -Parent $UProjectPath
           } else {
             $ProjectRoot  = $env:PROJECT_ROOT
-            $uprojects = Get-ChildItem -Path $ProjectRoot -Filter *.uproject -File
-            if ($uprojects.Count -ne 1) {
-              Write-Error "Expected exactly one .uproject in PROJECT_ROOT '$ProjectRoot', found $($uprojects.Count)."
-              exit 1
-            }
-            $UProjectPath = $uprojects[0].FullName
+            $uproject = Get-ChildItem -Path $ProjectRoot -Filter *.uproject -File | Select-Object -First 1
+            if (!$uproject) { Write-Error "No .uproject in PROJECT_ROOT"; exit 1 }
+            $UProjectPath = $uproject.FullName
           }
-      
+
           $ProjectName  = [IO.Path]::GetFileNameWithoutExtension($UProjectPath)
-      
-          $InputBuildScript = "${{ github.event.inputs.build_script_path }}"
-          if ([string]::IsNullOrWhiteSpace($InputBuildScript)) {
-            $BuildScript = Join-Path $ProjectRoot 'BuildScripts\Build.xml'
-          } else {
-            $BuildScript = $InputBuildScript
-            if (-not [IO.Path]::IsPathRooted($BuildScript)) {
-              $BuildScript = Join-Path $RepoRoot $BuildScript
-            }
-          }
-          if (!(Test-Path $BuildScript)) {
-            Write-Error "Build script not found at: $BuildScript"
-            exit 1
-          }
-      
-          $EnableTests     = "${{ github.event.inputs.enable_tests || 'true' }}"
-          $EnablePackage   = "${{ github.event.inputs.enable_packaging || 'true' }}"
-          $BuildConfig     = $env:BUILD_CONFIGURATION
-          $TargetPlatform  = $env:TARGET_PLATFORM
-      
-          $AutomationTests = "${{ github.event.inputs.automation_tests }}"
-          if ([string]::IsNullOrWhiteSpace($AutomationTests)) {
-            if ("${{ github.event_name }}" -eq "pull_request") {
-              $AutomationTests = "Group:System;Group:Smoke"
-            } elseif ("${{ github.ref }}" -eq "refs/heads/main") {
-              $AutomationTests = "Group:System;Group:Smoke;Group:Performance"
-            } else {
-              $AutomationTests = ""
-            }
-          }
-      
-          Write-Host "UE Path: $UEPath"
-          Write-Host "Repo Root: $RepoRoot"
-          Write-Host "Project Root: $ProjectRoot"
-          Write-Host "Project Name: $ProjectName"
-          Write-Host "UProject: $UProjectPath"
-          Write-Host "Build Script: $BuildScript"
-          if ($AutomationTests) { Write-Host "AutomationTests: $AutomationTests" } else { Write-Host "AutomationTests: <not set>" }
-      
-          $BuildGraphArgs = @(
-            "BuildGraph"
-            "-Script=`"$BuildScript`""
-            "-Target=CI"
-            "-set:ProjectName=$ProjectName"
-            "-set:ProjectRoot=`"$ProjectRoot`""
-            "-set:BuildConfiguration=$BuildConfig"
-            "-set:TargetPlatform=$TargetPlatform"
-            "-set:EnableTests=$EnableTests"
-            "-set:EnablePackage=$EnablePackage"
-            "-set:EnableLinting=true"
-          )
-      
-          Write-Host "Executing: $RunUATPath $($BuildGraphArgs -join ' ')"
-          & $RunUATPath @BuildGraphArgs
+          $InputBuild   = "${{ github.event.inputs.build_script_path }}"
+          $BuildScript  = if ([string]::IsNullOrWhiteSpace($InputBuild)) { Join-Path $ProjectRoot 'BuildScripts\Build.xml' } else { (Resolve-Path (Join-Path $RepoRoot $InputBuild)).Path }
+          if (!(Test-Path $BuildScript)) { Write-Error "Build.xml not found: $BuildScript"; exit 1 }
+
+          $EnableTests    = "${{ github.event.inputs.enable_tests || 'true' }}"
+          $EnablePackage  = "${{ github.event.inputs.enable_packaging || 'true' }}"
+          $BuildConfig    = $env:BUILD_CONFIGURATION
+          $TargetPlatform = $env:TARGET_PLATFORM
+
+          & $RunUATPath BuildGraph `
+            -Script="$BuildScript" `
+            -Target=CI `
+            -set:ProjectName=$ProjectName `
+            -set:ProjectRoot="$ProjectRoot" `
+            -set:BuildConfiguration=$BuildConfig `
+            -set:TargetPlatform=$TargetPlatform `
+            -set:EnableTests=$EnableTests `
+            -set:EnablePackage=$EnablePackage `
+            -set:EnableLinting=true
           if ($LASTEXITCODE -ne 0) {
-            Write-Error "BuildGraph failed with exit code $LASTEXITCODE"
-            if (Test-Path "Saved\Logs") {
-              Write-Host "Recent log files:"
-              Get-ChildItem "Saved\Logs" -Filter "*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {
-                Write-Host "=== $($_.Name) ==="
-                Get-Content $_.FullName -Tail 50
-              }
-            }
+            if (Test-Path "Saved\Logs") { Get-ChildItem "Saved\Logs" -Filter "*.log" | Sort LastWriteTime -Desc | Select -First 1 | % { Get-Content $_.FullName -Tail 200 } }
             exit $LASTEXITCODE
           }
-          Write-Host "BuildGraph pipeline completed successfully!"
-      
-      # Upload Artifacts
+
+      - name: Collect CI bundle
+        if: always()
+        shell: powershell
+        run: |
+          $bundle = "ArtifactsBundle"
+          if (Test-Path $bundle) { Remove-Item -Recurse -Force $bundle }
+          New-Item -ItemType Directory -Path $bundle | Out-Null
+          if (Test-Path ".\Saved\Automation\_Bundle") { robocopy ".\Saved\Automation\_Bundle" "$bundle" /E | Out-Null }
+          @(
+            @{From="Saved\Automation";   To="$bundle\_Raw\Automation"},
+            @{From="Saved\Logs";         To="$bundle\_Raw\Logs"},
+            @{From="Saved\StagedBuilds"; To="$bundle\_Raw\StagedBuilds"}
+          ) | % {
+            if (Test-Path $_.From) {
+              New-Item -ItemType Directory -Path $_.To -Force | Out-Null
+              robocopy $_.From $_.To /E | Out-Null
+            }
+          }
+          Compress-Archive -Path "$bundle\*" -DestinationPath "ci-bundle.zip" -Force
+
+      - name: Upload CI bundle (raw)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-bundle-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
+          path: ArtifactsBundle/**/*
+          retention-days: 14
+
+      - name: Upload CI bundle (zip)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-bundle-zip-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
+          path: ci-bundle.zip
+          retention-days: 30
+
       - name: Upload Build Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-logs-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
-          path: |
-            Saved/Logs/**/*
+          path: Saved/Logs/**/*
           retention-days: 7
-      
-      - name: Upload Test Results
+
+      - name: Upload Test Results (raw)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
-          path: |
-            Saved/Automation/**/*
+          path: Saved/Automation/**/*
           retention-days: 14
-      
-      - name: Upload Packaged Build
-        if: success() && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
-        uses: actions/upload-artifact@v4
-        with:
-          name: packaged-build-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
-          path: |
-            Saved/StagedBuilds/**/*
-          retention-days: 30
-      
-      # Publish Test Results
+
       - name: Publish Test Results
         if: always()
         uses: dorny/test-reporter@v1
         with:
           name: Unreal Automation Tests
-          path: 'Saved/Automation/**/*.xml'
+          path: |
+            Saved/Automation/**/*.xml
+            ArtifactsBundle/**/*.xml
           reporter: java-junit
           fail-on-error: false
-      
-      # Create Release
+
+      - name: Summary
+        if: always()
+        shell: powershell
+        run: |
+          $s = $env:GITHUB_STEP_SUMMARY
+          "### Tests" | Out-File $s -Encoding utf8
+          $n = (Get-ChildItem -Path "Saved\Automation","ArtifactsBundle" -Recurse -Filter *.xml -ErrorAction SilentlyContinue | Measure-Object).Count
+          "JUnit files: $n" | Out-File $s -Append
+          "### Performance (latest)" | Out-File $s -Append
+          $auto = Join-Path $PWD 'PerformanceTestResults_Automation.csv'
+          if (Test-Path $auto) {
+            $rows = Import-Csv $auto
+            if ($rows) {
+              $h = ($rows[0].PSObject.Properties.Name)
+              "| " + ($h -join " | ") + " |" | Out-File $s -Append
+              "| " + (($h | % { "---" }) -join " | ") + " |" | Out-File $s -Append
+              $rows | Select-Object -First 5 | % { "| " + ($h | % { "$($_.$_)" } -join " | ") + " |" } | Out-File $s -Append
+            }
+          } else {
+            "No PerformanceTestResults_Automation.csv" | Out-File $s -Append
+          }
+          $arch = Join-Path $PWD 'ArchiveDirectory'
+          if (Test-Path $arch) {
+            $latest = Get-ChildItem $arch -Filter 'PerformanceTestResults_*.csv' | Sort LastWriteTime -Desc | Select -First 1
+            if ($latest) {
+              "`n$($latest.Name)" | Out-File $s -Append
+              $rows = Import-Csv $latest.FullName
+              if ($rows) {
+                $h = ($rows[0].PSObject.Properties.Name)
+                "| " + ($h -join " | ") + " |" | Out-File $s -Append
+                "| " + (($h | % { "---" }) -join " | ") + " |" | Out-File $s -Append
+                $rows | Select-Object -First 5 | % { "| " + ($h | % { "$($_.$_)" } -join " | ") + " |" } | Out-File $s -Append
+              }
+            }
+          }
+
       - name: Create Release
         if: success() && github.ref == 'refs/heads/main' && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
         uses: actions/create-release@v1
@@ -283,58 +221,52 @@ jobs:
           tag_name: build-${{ github.run_number }}
           release_name: Build ${{ github.run_number }}
           body: |
-            Automated build from commit ${{ github.sha }}
-            
-            **Configuration:** ${{ env.BUILD_CONFIGURATION }}
-            **Platform:** ${{ env.TARGET_PLATFORM }}
-            
-            Download the packaged build from the artifacts above.
+            Build from ${{ github.sha }}
+            Configuration: ${{ env.BUILD_CONFIGURATION }}
+            Platform: ${{ env.TARGET_PLATFORM }}
           draft: false
           prerelease: ${{ env.BUILD_CONFIGURATION != 'Shipping' }}
 
-  # Parallel static analysis job
+      - name: Attach CI bundle to Release
+        if: success() && github.ref == 'refs/heads/main' && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ci-bundle.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   static-analysis:
     name: Static Code Analysis
     runs-on: [self-hosted, windows]
     if: github.event_name == 'pull_request'
-    
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 0
-        lfs: true
-    
-    - name: Verify Precompiled Engine
-      run: |
-        $UEPath = $env:UE_ENGINE_PATH
-        if (!(Test-Path "$UEPath\Engine\Build\BatchFiles\RunUAT.bat")) {
-          Write-Error "Precompiled engine not found at: $UEPath"
-          exit 1
-        }
-        Write-Host "Using precompiled engine for analysis"
-      shell: powershell
-    
-    - name: Run BuildGraph Analysis Only
-      run: |
-        $UEPath = $env:UE_ENGINE_PATH
-        $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
-        $ProjectRoot = $PWD.Path
-        
-        & $RunUATPath BuildGraph `
-          -Script="$ProjectRoot\BuildScripts\Build.xml" `
-          -Target=Analyze `
-          -set:ProjectName=$env:PROJECT_NAME `
-          -set:ProjectRoot="$ProjectRoot" `
-          -set:BuildConfiguration=$env:BUILD_CONFIGURATION `
-          -set:EnableLinting=true
-      shell: powershell
-    
-    - name: Upload Analysis Results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: static-analysis-results
-        path: |
-          Saved/Logs/**/*StaticAnalysis*
-        retention-days: 7
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          lfs: true
+      - name: Verify Precompiled Engine
+        shell: powershell
+        run: |
+          $UEPath = $env:UE_ENGINE_PATH
+          if (!(Test-Path "$UEPath\Engine\Build\BatchFiles\RunUAT.bat")) { Write-Error "RunUAT missing"; exit 1 }
+      - name: BuildGraph Analyze
+        shell: powershell
+        run: |
+          $UEPath = $env:UE_ENGINE_PATH
+          $RunUATPath = "$UEPath\Engine\Build\BatchFiles\RunUAT.bat"
+          $ProjectRoot = $PWD.Path
+          & $RunUATPath BuildGraph `
+            -Script="$ProjectRoot\BuildScripts\Build.xml" `
+            -Target=Analyze `
+            -set:ProjectName=$env:PROJECT_NAME `
+            -set:ProjectRoot="$ProjectRoot" `
+            -set:BuildConfiguration=$env:BUILD_CONFIGURATION `
+            -set:EnableLinting=true
+      - name: Upload Analysis Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: static-analysis-results
+          path: Saved/Logs/**/*StaticAnalysis*
+          retention-days: 7
