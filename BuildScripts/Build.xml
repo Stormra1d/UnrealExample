@@ -1,6 +1,4 @@
 <BuildGraph xmlns="http://www.epicgames.com/BuildGraph" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.epicgames.com/BuildGraph ../Schema.xsd">
-  
-  <!-- Configuration -->
   <Option Name="ProjectName" DefaultValue="" Description="Name of the project" />
   <Option Name="ProjectRoot" DefaultValue="" Description="Root directory of the project" />
 
@@ -9,8 +7,8 @@
   <Property Name="AutomationOutDir" Value="$(ProjectRoot)\Saved\Automation" />
 
   <Error Message="Project file $(ProjectFile) does not exist" If="!Exists('$(ProjectFile)')" />
-  <Error Message="ProjectName must be specified" If="'$(ProjectName)' == ''" />
-  <Error Message="ProjectRoot must be specified" If="'$(ProjectRoot)' == ''" />
+  <Error Message="ProjectName must be specified via -set:ProjectName=..." If="'$(ProjectName)' == ''" />
+  <Error Message="ProjectRoot must be specified via -set:ProjectRoot=..." If="'$(ProjectRoot)' == ''" />
 
   <Option Name="BuildConfiguration" DefaultValue="Development" Restrict="Debug|Development|Shipping|Test" />
   <Option Name="TargetPlatform" DefaultValue="Win64" Restrict="Win64|Linux|Mac" />
@@ -20,12 +18,11 @@
   <Option Name="EnablePackage" DefaultValue="true" Restrict="true|false" />
   <Option Name="EnableTests" DefaultValue="true" Restrict="true|false" />
   <Option Name="ForceEngineRebuild" DefaultValue="false" Restrict="true|false" />
+  <Option Name="AutomationTests" DefaultValue="Game.FPSCharacter.*" />
 
   <Agent Name="Build Agent" Type="Win64">
-
     <Node Name="GenerateProjectFiles">
-      <Spawn Exe="$(RootDir)\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe"
-             Arguments="-ProjectFiles -Project=&quot;$(ProjectFile)&quot; -Game" />
+      <Spawn Exe="$(RootDir)\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe" Arguments="-ProjectFiles -Project=&quot;$(ProjectFile)&quot; -Game" />
     </Node>
 
     <Node Name="EnsureEnginePrerequisites" Requires="GenerateProjectFiles" If="$(ForceEngineRebuild)">
@@ -55,11 +52,9 @@
     <Node Name="PackageProject" Requires="StageProject" If="$(EnablePackage)">
       <Command Name="BuildCookRun" Arguments="-Project=&quot;$(ProjectFile)&quot; -Platform=$(TargetPlatform) -Configuration=$(BuildConfiguration) -SkipBuild -SkipCook -SkipStage -SkipPak -Package -NoCodeSign" />
     </Node>
-
   </Agent>
 
   <Agent Name="Test Agent" Type="Win64">
-
     <Node Name="RunEditorTests" Requires="BuildEditor" If="$(EnableTests)">
       <Command Name="RunUnreal" Arguments="
         -project=&quot;$(ProjectFile)&quot;
@@ -73,6 +68,7 @@
         -reportall
         -reportexporters=xml
         -timeout=18000
+        -maxtestduration=18000
         -heartbeatperiod=60
         -unattended -nop4 -nosplash" />
     </Node>
@@ -105,57 +101,61 @@
         -reportall
         -reportexporters=xml
         -timeout=18000
+        -maxtestduration=18000
         -heartbeatperiod=60
         -unattended -nop4 -nosplash" />
     </Node>
 
     <Node Name="TestBlueprintCompilation" Requires="BuildEditor" If="$(EnableTests)">
       <Commandlet Name="CompileAllBlueprints" Project="$(ProjectFile)" />
-      <Tag Files="$(AutomationOutDir)\..." With="#AutomationReports" />
+      <Tag Files="$(AutomationOutDir)\..." With="#AutomationReports" If="$(EnableTests)" />
     </Node>
 
     <Node Name="CollectArtifacts" Requires="RunEditorTests;RunClientTests_Func;RunClientTests_AI" If="$(EnableTests)">
-      <Spawn Exe="powershell.exe" Arguments="
-        -NoProfile -ExecutionPolicy Bypass -Command
-        $Root='$(ProjectRoot)'; 
-        $Bundle=Join-Path $Root 'Saved\Automation\_Bundle';
-        if (Test-Path $Bundle) { Remove-Item -Recurse -Force $Bundle }
-        New-Item -ItemType Directory -Path $Bundle | Out-Null
-        @('Saved\Automation\Editor\Automation','Saved\Automation\Client\Func\Automation','Saved\Automation\Client\AI\Automation') | % {
-          $src = Join-Path $Root $_
-          if (Test-Path $src) { robocopy $src (Join-Path $Bundle (Split-Path $_ -Leaf)) *.xml *.json *.html /E | Out-Null }
-        }
-        $top = Join-Path $Root 'Saved\Automation'
-        if (Test-Path (Join-Path $top 'index.json')) { Copy-Item (Join-Path $top 'index.*') $Bundle -ErrorAction SilentlyContinue }
-        $bot = Join-Path $Root 'Saved\Automation\BotResults\Latest.json'
-        if (Test-Path $bot) { New-Item -ItemType Directory -Path (Join-Path $Bundle 'BotResults') -Force | Out-Null; Copy-Item $bot (Join-Path $Bundle 'BotResults') }
-        $logs = Join-Path $Root 'Saved\Logs'
-        if (Test-Path $logs) { New-Item -ItemType Directory -Path (Join-Path $Bundle 'Logs') -Force | Out-Null; robocopy $logs (Join-Path $Bundle 'Logs') *.log /E | Out-Null }
-        $autoCsv = Join-Path $Root 'PerformanceTestResults_Automation.csv'
-        if (Test-Path $autoCsv) { Copy-Item $autoCsv (Join-Path $Bundle 'Performance_Automation.csv') }
-        $arch = Join-Path $Root 'ArchiveDirectory'
-        if (Test-Path $arch) {
-          $latest = Get-ChildItem $arch -Filter 'PerformanceTestResults_*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          if ($latest) { Copy-Item $latest.FullName (Join-Path $Bundle 'Performance_Archive_Latest.csv') }
-        }" />
+      <Spawn Exe="powershell.exe" Arguments="-NoProfile -ExecutionPolicy Bypass -Command ^
+        $Root='$(ProjectRoot)'; ^
+        $B=Join-Path $Root 'Saved\Automation\_Bundle'; ^
+        if (Test-Path $B){Remove-Item -Recurse -Force $B}; ^
+        New-Item -ItemType Directory -Path $B | Out-Null; ^
+        foreach($p in 'Saved\Automation\Editor\Automation','Saved\Automation\Client\Func\Automation','Saved\Automation\Client\AI\Automation'){ ^
+          $src=Join-Path $Root $p; if(Test-Path $src){robocopy $src (Join-Path $B (Split-Path $p -Leaf)) *.xml *.json *.html /E | Out-Null} ^
+        }; ^
+        $top=Join-Path $Root 'Saved\Automation'; ^
+        if(Test-Path (Join-Path $top 'index.json')){Copy-Item (Join-Path $top 'index.*') $B -ErrorAction SilentlyContinue}; ^
+        $bot=Join-Path $Root 'Saved\Automation\BotResults\Latest.json'; ^
+        if(Test-Path $bot){New-Item -ItemType Directory -Path (Join-Path $B 'BotResults') -Force | Out-Null; Copy-Item $bot (Join-Path $B 'BotResults')}; ^
+        $logs=Join-Path $Root 'Saved\Logs'; ^
+        if(Test-Path $logs){New-Item -ItemType Directory -Path (Join-Path $B 'Logs') -Force | Out-Null; robocopy $logs (Join-Path $B 'Logs') *.log /E | Out-Null}; ^
+        $auto=Join-Path $Root 'PerformanceTestResults_Automation.csv'; if(Test-Path $auto){Copy-Item $auto (Join-Path $B 'Performance_Automation.csv')}; ^
+        $arch=Join-Path $Root 'ArchiveDirectory'; ^
+        if(Test-Path $arch){$latest=Get-ChildItem $arch -Filter 'PerformanceTestResults_*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if($latest){Copy-Item $latest.FullName (Join-Path $B 'Performance_Archive_Latest.csv')}}"
+      />
     </Node>
 
     <Node Name="EnsureJUnit" Requires="CollectArtifacts" If="$(EnableTests)">
-      <Spawn Exe="powershell.exe" Arguments="
-        -NoProfile -ExecutionPolicy Bypass -Command
-        $Bundle='$(ProjectRoot)\Saved\Automation\_Bundle';
-        if (!(Test-Path $Bundle)) { exit 0 }
-        $hasXml = (Get-ChildItem -Path $Bundle -Recurse -Filter *.xml -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0
-        if ($hasXml) { exit 0 }
-        $jsons = Get-ChildItem -Path $Bundle -Recurse -Filter index.json -ErrorAction SilentlyContinue
-        if (!$jsons) { exit 0 }
-        foreach ($j in $jsons) {
-          $suite = (Split-Path $j.DirectoryName -Leaf)
-          $xml   = Join-Path $j.DirectoryName 'junit-converted.xml'
-          '<?xml version="1.0" encoding="UTF-8"?><testsuite name="' + $suite + '" tests="0" failures="0" errors="0"></testsuite>' | Out-File $xml -Encoding utf8
-        }" />
+      <Spawn Exe="powershell.exe" Arguments="-NoProfile -ExecutionPolicy Bypass -Command ^
+        $B='$(ProjectRoot)\Saved\Automation\_Bundle'; ^
+        if(!(Test-Path $B)){exit 0}; ^
+        $hasXml=(Get-ChildItem -Path $B -Recurse -Filter *.xml -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0; ^
+        if($hasXml){exit 0}; ^
+        $jsons=Get-ChildItem -Path $B -Recurse -Filter index.json -ErrorAction SilentlyContinue; ^
+        foreach($j in $jsons){ ^
+          $suite=Split-Path $j.DirectoryName -Leaf; ^
+          $xml=Join-Path $j.DirectoryName 'junit-converted.xml'; ^
+          Set-Content -Path $xml -Encoding UTF8 -Value '<?xml version=""1.0"" encoding=""UTF-8""?><testsuite name=""'+$suite+'"" tests=""0"" failures=""0"" errors=""0""></testsuite>' ^
+        }"
+      />
+    </Node>
+  </Agent>
+
+  <Agent Name="Analysis Agent" Type="Win64">
+    <Node Name="RunCodeAnalysis" Requires="GenerateProjectFiles">
+      <Compile Target="$(ProjectName)Editor" Platform="Win64" Configuration="$(BuildConfiguration)" Project="$(ProjectFile)" Arguments="-StaticAnalyzer=Default -NoPCH -NoSharedPCH -DisableUnity -NoLink -NoHotReloadFromIDE" />
     </Node>
 
+    <Node Name="ValidateAssets" Requires="BuildEditor">
+      <Commandlet Name="DataValidation" Arguments="-Project=&quot;$(ProjectFile)&quot; -Unattended" />
+    </Node>
   </Agent>
 
   <Property Name="BuildNodes" Value="GenerateProjectFiles" />
@@ -167,26 +167,21 @@
   <Property Name="PackageNodes" Value="$(PackageNodes);StageProject;PackageProject" If="$(EnablePackage)" />
 
   <Property Name="TestNodes" Value="" />
-  <Property Name="TestNodes" Value="$(TestNodes);RunEditorTests;RunClientTests_Func;RunClientTests_AI;CollectArtifacts;EnsureJUnit" If="$(EnableTests)" />
+  <Property Name="TestNodes" Value="$(TestNodes);RunEditorTests;RunClientTests_Func;RunClientTests_AI" If="$(EnableTests)" />
+  <Property Name="TestNodes" Value="$(TestNodes);CollectArtifacts;EnsureJUnit" If="$(EnableTests)" />
   <Aggregate Name="Test" Requires="$(TestNodes)" If="'$(TestNodes)' != ''" />
 
-  <Agent Name="Analysis Agent" Type="Win64">
-    <Node Name="RunCodeAnalysis" Requires="GenerateProjectFiles">
-      <Compile Target="$(ProjectName)Editor" Platform="Win64" Configuration="$(BuildConfiguration)" Project="$(ProjectFile)" Arguments="-StaticAnalyzer=Default -NoPCH -NoSharedPCH -DisableUnity -NoLink -NoHotReloadFromIDE" />
-    </Node>
-    <Node Name="ValidateAssets" Requires="BuildEditor">
-      <Commandlet Name="DataValidation" Arguments="-Project=&quot;$(ProjectFile)&quot; -Unattended" />
-    </Node>
-  </Agent>
-
+  <Property Name="AnalysisNodes" Value="" />
   <Property Name="AnalysisNodes" Value="RunCodeAnalysis;ValidateAssets" />
 
-  <Aggregate Name="Build"   Requires="$(BuildNodes)" />
+  <Aggregate Name="Build" Requires="$(BuildNodes)" />
   <Aggregate Name="Package" Requires="$(PackageNodes)" />
-  <Aggregate Name="Analyze" Requires="$(AnalysisNodes)" />
-  <Property  Name="CINodes" Value="$(PackageNodes)" />
-  <Property  Name="CINodes" Value="$(CINodes);$(TestNodes)" If="'$(TestNodes)' != ''" />
-  <Property  Name="CINodes" Value="$(CINodes);$(AnalysisNodes)" If="'$(AnalysisNodes)' != ''" />
-  <Aggregate Name="CI"      Requires="$(CINodes)" />
+  <Aggregate Name="Analyze" Requires="$(AnalysisNodes)" If="'$(AnalysisNodes)' != ''" />
+
+  <Property Name="CINodes" Value="$(PackageNodes)" />
+  <Property Name="CINodes" Value="$(CINodes);$(TestNodes)" If="$(EnableTests) And '$(TestNodes)' != ''" />
+  <Property Name="CINodes" Value="$(CINodes);$(AnalysisNodes)" If="'$(AnalysisNodes)' != ''" />
+
+  <Aggregate Name="CI" Requires="$(CINodes)" />
   <Aggregate Name="Default" Requires="CI" />
 </BuildGraph>

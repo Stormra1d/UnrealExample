@@ -49,70 +49,76 @@ jobs:
     timeout-minutes: 120
 
     steps:
-      - name: Checkout
+      # Checkout
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
 
+      # Verify precompiled engine
       - name: Verify Precompiled Engine
         shell: powershell
         run: |
           $UEPath = $env:UE_ENGINE_PATH
+          if (!(Test-Path $UEPath)) { Write-Error "Engine not found: $UEPath"; exit 1 }
           if (!(Test-Path "$UEPath\Engine\Build\BatchFiles\RunUAT.bat")) { Write-Error "RunUAT missing"; exit 1 }
           if (!(Test-Path "$UEPath\Engine\Binaries\Win64\UnrealEditor.exe")) { Write-Error "UnrealEditor.exe missing"; exit 1 }
-          if (!(Test-Path "$UEPath\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe")) { Write-Error "UBT missing"; exit 1 }
+          if (!(Test-Path "$UEPath\Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe")) { Write-Error "UnrealBuildTool.exe missing"; exit 1 }
 
-      - name: Clean previous outputs
+      # Clean Saved and intermediates
+      - name: Clean previous build outputs
         shell: powershell
         run: |
-          @("Binaries","Intermediate","Saved/StagedBuilds","Saved/Cooked","Saved/Automation","Saved/Logs") |
-            % { if (Test-Path $_) { Remove-Item -Recurse -Force $_ } }
+          foreach ($d in "Binaries","Intermediate","Saved/StagedBuilds","Saved/Cooked","Saved/Automation","Saved/Logs") {
+            if (Test-Path $d) { Remove-Item -Recurse -Force $d -ErrorAction SilentlyContinue }
+          }
 
+      # Run BuildGraph (CI)
       - name: Run BuildGraph CI Pipeline
         shell: powershell
         run: |
-          $UEPath     = $env:UE_ENGINE_PATH
-          $RunUATPath = Join-Path $UEPath 'Engine\Build\BatchFiles\RunUAT.bat'
-          $RepoRoot   = $PWD.Path
+          $UEPath = $env:UE_ENGINE_PATH
+          $RunUAT = Join-Path $UEPath 'Engine\Build\BatchFiles\RunUAT.bat'
+          $RepoRoot = $PWD.Path
+          if (!(Test-Path $RunUAT)) { Write-Error "RunUAT not found"; exit 1 }
 
           if (-not $env:PROJECT_ROOT -or -not (Test-Path $env:PROJECT_ROOT)) {
             $uproject = Get-ChildItem -Path $RepoRoot -Filter *.uproject -File -Recurse | Select-Object -First 1
-            if (!$uproject) { Write-Error "No .uproject found"; exit 1 }
-            $UProjectPath = $uproject.FullName
-            $ProjectRoot  = Split-Path -Parent $UProjectPath
+            if (-not $uproject) { Write-Error "No .uproject found"; exit 1 }
+            $ProjectRoot = Split-Path -Parent $uproject.FullName
           } else {
-            $ProjectRoot  = $env:PROJECT_ROOT
-            $uproject = Get-ChildItem -Path $ProjectRoot -Filter *.uproject -File | Select-Object -First 1
-            if (!$uproject) { Write-Error "No .uproject in PROJECT_ROOT"; exit 1 }
-            $UProjectPath = $uproject.FullName
+            $ProjectRoot = $env:PROJECT_ROOT
           }
+          $ProjectName = [IO.Path]::GetFileNameWithoutExtension((Get-ChildItem $ProjectRoot -Filter *.uproject -File).FullName)
 
-          $ProjectName  = [IO.Path]::GetFileNameWithoutExtension($UProjectPath)
-          $InputBuild   = "${{ github.event.inputs.build_script_path }}"
-          $BuildScript  = if ([string]::IsNullOrWhiteSpace($InputBuild)) { Join-Path $ProjectRoot 'BuildScripts\Build.xml' } else { (Resolve-Path (Join-Path $RepoRoot $InputBuild)).Path }
-          if (!(Test-Path $BuildScript)) { Write-Error "Build.xml not found: $BuildScript"; exit 1 }
+          $InputBuildScript = "${{ github.event.inputs.build_script_path }}"
+          if ([string]::IsNullOrWhiteSpace($InputBuildScript)) { $BuildScript = Join-Path $ProjectRoot 'BuildScripts\Build.xml' } else { $BuildScript = (Split-Path -IsAbsolute $InputBuildScript) ? $InputBuildScript : (Join-Path $RepoRoot $InputBuildScript) }
+          if (!(Test-Path $BuildScript)) { Write-Error "Build script not found: $BuildScript"; exit 1 }
 
-          $EnableTests    = "${{ github.event.inputs.enable_tests || 'true' }}"
-          $EnablePackage  = "${{ github.event.inputs.enable_packaging || 'true' }}"
-          $BuildConfig    = $env:BUILD_CONFIGURATION
-          $TargetPlatform = $env:TARGET_PLATFORM
-
-          & $RunUATPath BuildGraph `
-            -Script="$BuildScript" `
-            -Target=CI `
-            -set:ProjectName=$ProjectName `
-            -set:ProjectRoot="$ProjectRoot" `
-            -set:BuildConfiguration=$BuildConfig `
-            -set:TargetPlatform=$TargetPlatform `
-            -set:EnableTests=$EnableTests `
-            -set:EnablePackage=$EnablePackage `
-            -set:EnableLinting=true
+          $args = @(
+            "BuildGraph",
+            "-Script=`"$BuildScript`"",
+            "-Target=CI",
+            "-set:ProjectName=$ProjectName",
+            "-set:ProjectRoot=`"$ProjectRoot`"",
+            "-set:BuildConfiguration=$env:BUILD_CONFIGURATION",
+            "-set:TargetPlatform=$env:TARGET_PLATFORM",
+            "-set:EnableTests=${{ github.event.inputs.enable_tests || 'true' }}",
+            "-set:EnablePackage=${{ github.event.inputs.enable_packaging || 'true' }}",
+            "-set:EnableLinting=true"
+          )
+          & $RunUAT @args
           if ($LASTEXITCODE -ne 0) {
-            if (Test-Path "Saved\Logs") { Get-ChildItem "Saved\Logs" -Filter "*.log" | Sort LastWriteTime -Desc | Select -First 1 | % { Get-Content $_.FullName -Tail 200 } }
+            if (Test-Path "Saved\Logs") {
+              Get-ChildItem "Saved\Logs" -Filter "*.log" | Sort-Object LastWriteTime -Descending | Select-Object -First 3 | ForEach-Object {
+                Write-Host "=== $($_.Name) ==="; Get-Content $_.FullName -Tail 50
+              }
+            }
             exit $LASTEXITCODE
           }
 
+      # Collect CI bundle
       - name: Collect CI bundle
         if: always()
         shell: powershell
@@ -120,19 +126,13 @@ jobs:
           $bundle = "ArtifactsBundle"
           if (Test-Path $bundle) { Remove-Item -Recurse -Force $bundle }
           New-Item -ItemType Directory -Path $bundle | Out-Null
-          if (Test-Path ".\Saved\Automation\_Bundle") { robocopy ".\Saved\Automation\_Bundle" "$bundle" /E | Out-Null }
-          @(
-            @{From="Saved\Automation";   To="$bundle\_Raw\Automation"},
-            @{From="Saved\Logs";         To="$bundle\_Raw\Logs"},
-            @{From="Saved\StagedBuilds"; To="$bundle\_Raw\StagedBuilds"}
-          ) | % {
-            if (Test-Path $_.From) {
-              New-Item -ItemType Directory -Path $_.To -Force | Out-Null
-              robocopy $_.From $_.To /E | Out-Null
-            }
+          if (Test-Path ".\Saved\Automation\_Bundle") { robocopy ".\Saved\Automation\_Bundle" "$bundle" /E /NFL /NDL /NJH /NJS /NP | Out-Null }
+          foreach ($m in @{From="Saved\Automation";To="$bundle\_Raw\Automation"}, @{From="Saved\Logs";To="$bundle\_Raw\Logs"}, @{From="Saved\StagedBuilds";To="$bundle\_Raw\StagedBuilds"}) {
+            if (Test-Path $m.From) { New-Item -ItemType Directory -Path $m.To -Force | Out-Null; robocopy $m.From $m.To /E /NFL /NDL /NJH /NJS /NP | Out-Null }
           }
           Compress-Archive -Path "$bundle\*" -DestinationPath "ci-bundle.zip" -Force
 
+      # Upload artifacts
       - name: Upload CI bundle (raw)
         if: always()
         uses: actions/upload-artifact@v4
@@ -157,7 +157,7 @@ jobs:
           path: Saved/Logs/**/*
           retention-days: 7
 
-      - name: Upload Test Results (raw)
+      - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -165,6 +165,15 @@ jobs:
           path: Saved/Automation/**/*
           retention-days: 14
 
+      - name: Upload Packaged Build
+        if: success() && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
+        uses: actions/upload-artifact@v4
+        with:
+          name: packaged-build-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
+          path: Saved/StagedBuilds/**/*
+          retention-days: 30
+
+      # Publish JUnit
       - name: Publish Test Results
         if: always()
         uses: dorny/test-reporter@v1
@@ -176,42 +185,42 @@ jobs:
           reporter: java-junit
           fail-on-error: false
 
-      - name: Summary
+      # Summary (plain)
+      - name: Generate workflow summary
         if: always()
         shell: powershell
         run: |
           $s = $env:GITHUB_STEP_SUMMARY
-          "### Tests" | Out-File $s -Encoding utf8
-          $n = (Get-ChildItem -Path "Saved\Automation","ArtifactsBundle" -Recurse -Filter *.xml -ErrorAction SilentlyContinue | Measure-Object).Count
-          "JUnit files: $n" | Out-File $s -Append
-          "### Performance (latest)" | Out-File $s -Append
+          "## CI Summary ($env:BUILD_CONFIGURATION / $env:TARGET_PLATFORM)" | Out-File $s -Encoding utf8
+          $xmlCount = (Get-ChildItem -Path "Saved\Automation","ArtifactsBundle" -Recurse -Filter *.xml -ErrorAction SilentlyContinue | Measure-Object).Count
+          "JUnit XML files: $xmlCount" | Out-File $s -Append
           $auto = Join-Path $PWD 'PerformanceTestResults_Automation.csv'
           if (Test-Path $auto) {
+            "`n### PerformanceTestResults_Automation.csv (first 10 rows)" | Out-File $s -Append
             $rows = Import-Csv $auto
-            if ($rows) {
-              $h = ($rows[0].PSObject.Properties.Name)
-              "| " + ($h -join " | ") + " |" | Out-File $s -Append
-              "| " + (($h | % { "---" }) -join " | ") + " |" | Out-File $s -Append
-              $rows | Select-Object -First 5 | % { "| " + ($h | % { "$($_.$_)" } -join " | ") + " |" } | Out-File $s -Append
+            if ($rows.Count -gt 0) {
+              $cols = ($rows[0].PsObject.Properties.Name)
+              "| " + ($cols -join " | ") + " |" | Out-File $s -Append
+              "| " + (($cols | ForEach-Object { "---" }) -join " | ") + " |" | Out-File $s -Append
+              $rows | Select-Object -First 10 | ForEach-Object { "| " + ($cols | ForEach-Object { "$($_.$_)" } -join " | ") + " |" | Out-File $s -Append }
             }
-          } else {
-            "No PerformanceTestResults_Automation.csv" | Out-File $s -Append
           }
           $arch = Join-Path $PWD 'ArchiveDirectory'
           if (Test-Path $arch) {
-            $latest = Get-ChildItem $arch -Filter 'PerformanceTestResults_*.csv' | Sort LastWriteTime -Desc | Select -First 1
+            $latest = Get-ChildItem $arch -Filter 'PerformanceTestResults_*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
             if ($latest) {
-              "`n$($latest.Name)" | Out-File $s -Append
+              "`n### $($latest.Name) (first 10 rows)" | Out-File $s -Append
               $rows = Import-Csv $latest.FullName
-              if ($rows) {
-                $h = ($rows[0].PSObject.Properties.Name)
-                "| " + ($h -join " | ") + " |" | Out-File $s -Append
-                "| " + (($h | % { "---" }) -join " | ") + " |" | Out-File $s -Append
-                $rows | Select-Object -First 5 | % { "| " + ($h | % { "$($_.$_)" } -join " | ") + " |" } | Out-File $s -Append
+              if ($rows.Count -gt 0) {
+                $cols = ($rows[0].PsObject.Properties.Name)
+                "| " + ($cols -join " | ") + " |" | Out-File $s -Append
+                "| " + (($cols | ForEach-Object { "---" }) -join " | ") + " |" | Out-File $s -Append
+                $rows | Select-Object -First 10 | ForEach-Object { "| " + ($cols | ForEach-Object { "$($_.$_)" } -join " | ") + " |" | Out-File $s -Append }
               }
             }
           }
 
+      # Create Release
       - name: Create Release
         if: success() && github.ref == 'refs/heads/main' && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
         uses: actions/create-release@v1
@@ -221,12 +230,14 @@ jobs:
           tag_name: build-${{ github.run_number }}
           release_name: Build ${{ github.run_number }}
           body: |
-            Build from ${{ github.sha }}
+            Automated build from commit ${{ github.sha }}
+
             Configuration: ${{ env.BUILD_CONFIGURATION }}
             Platform: ${{ env.TARGET_PLATFORM }}
           draft: false
           prerelease: ${{ env.BUILD_CONFIGURATION != 'Shipping' }}
 
+      # Attach ZIP to Release
       - name: Attach CI bundle to Release
         if: success() && github.ref == 'refs/heads/main' && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
         uses: softprops/action-gh-release@v2
@@ -240,17 +251,19 @@ jobs:
     runs-on: [self-hosted, windows]
     if: github.event_name == 'pull_request'
     steps:
-      - name: Checkout
+      - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
           lfs: true
+
       - name: Verify Precompiled Engine
         shell: powershell
         run: |
           $UEPath = $env:UE_ENGINE_PATH
-          if (!(Test-Path "$UEPath\Engine\Build\BatchFiles\RunUAT.bat")) { Write-Error "RunUAT missing"; exit 1 }
-      - name: BuildGraph Analyze
+          if (!(Test-Path "$UEPath\Engine\Build\BatchFiles\RunUAT.bat")) { Write-Error "Engine not found"; exit 1 }
+
+      - name: Run BuildGraph Analysis Only
         shell: powershell
         run: |
           $UEPath = $env:UE_ENGINE_PATH
@@ -263,6 +276,7 @@ jobs:
             -set:ProjectRoot="$ProjectRoot" `
             -set:BuildConfiguration=$env:BUILD_CONFIGURATION `
             -set:EnableLinting=true
+
       - name: Upload Analysis Results
         if: always()
         uses: actions/upload-artifact@v4
