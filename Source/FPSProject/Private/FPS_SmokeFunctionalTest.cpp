@@ -10,7 +10,7 @@
 
 AFPS_SmokeFunctionalTest::AFPS_SmokeFunctionalTest()
 	: TestPlayer(nullptr), TestWeapon(nullptr) {
-	Rename(TEXT("Smoke Functional Test"));
+	Rename(TEXT("SmokeFunctionalTest"));
 	Description = "Testing";
 
 

@@ -147,16 +147,16 @@
     </Node>
     -->
 
-    <Node Name="RunClientTests_Perf" Requires="StageProject" If="$(EnableTests)">
-      <Log Message="Running Client Automation (Group:Perf) via Gauntlet" />
+    <Node Name="RunClientTests_Func" Requires="StageProject" If="$(EnableTests)">
+      <Log Message="Running Client Automation (Group:Func) via Gauntlet" />
       <Command Name="RunUnreal" Arguments="
         -project=&quot;$(ProjectFile)&quot;
         -platform=$(TargetPlatform)
         -configuration=$(BuildConfiguration)
         -test=UE.TargetAutomation
-        -runtest=Group:Perf
+        -runtest=Group:Func
         -build=local
-        -reportdir=&quot;$(AutomationOutDir)\Client\Perf&quot;"/>
+        -reportdir=&quot;$(AutomationOutDir)\Client\Func&quot;"/>
     </Node>
 
     <Node Name="RunClientTests_AI" Requires="StageProject" If="$(EnableTests)">
@@ -219,7 +219,7 @@
   <Property Name="TestNodes" Value="$(TestNodes);RunEditorTests;RunClientTests_AI;TestBlueprintCompilation" If="$(EnableTests)" />
   <!--<Property Name="TestNodes" Value="$(TestNodes);RunClientTests_UI" />
   <Property Name="TestNodes" Value="$(TestNodes);RunClientTests_Visual" /> -->
-  <Property Name="TestNodes" Value="$(TestNodes);RunClientTests_Perf" /> 
+  <Property Name="TestNodes" Value="$(TestNodes);RunClientTests_Func" /> 
   <Aggregate Name="Test" Requires="$(TestNodes)" If="'$(TestNodes)' != ''" />
 
   <Property Name="AnalysisNodes" Value="" />
