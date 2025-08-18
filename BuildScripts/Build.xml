@@ -13,10 +13,6 @@
   <Option Name="ProjectName" DefaultValue="" Description="Name of the project" />
   <Option Name="ProjectRoot" DefaultValue="" Description="Root directory of the project" />
 
-  <Property Name="ProjectFile" Value="$(ProjectRoot)\$(ProjectName).uproject" />
-  <Property Name="BuildOutputDir" Value="$(ProjectRoot)\Saved\StagedBuilds" />
-  <Property Name="AutomationOutDir" Value="$(ProjectRoot)\Saved\Automation" />
-
   <Error Message="Project file $(ProjectFile) does not exist" If="!Exists('$(ProjectFile)')" />
   <Error Message="ProjectName must be specified via -set:ProjectName=..." If="'$(ProjectName)' == ''" />
   <Error Message="ProjectRoot must be specified via -set:ProjectRoot=..." If="'$(ProjectRoot)' == ''" />
@@ -98,6 +94,7 @@
         -reportexporters=xml
         -timeout=18000
         -maxtestduration=18000
+        -MaxDuration=18000
         -heartbeatperiod=60
         -unattended -nop4 -nosplash" />
     </Node>
@@ -113,7 +110,11 @@
         -reportdir=&quot;$(AutomationOutDir)\Client\Func\Gauntlet&quot;
         -ReportExportPath=&quot;$(AutomationOutDir)\Client\Func\Automation&quot;
         -reportall
-        -reportexporters=xml" />
+        -reportexporters=xml
+        -timeout=18000
+        -maxtestduration=18000
+        -MaxDuration=18000
+        -heartbeatperiod=60" />
     </Node>
 
     <Node Name="RunClientTests_AI" Requires="StageProject" If="$(EnableTests)">
@@ -131,6 +132,7 @@
         -reportexporters=xml
         -timeout=18000
         -maxtestduration=18000
+        -MaxDuration=18000
         -heartbeatperiod=60
         -unattended -nop4 -nosplash" />
     </Node>
@@ -160,27 +162,6 @@
         if(Test-Path $arch){$latest=Get-ChildItem $arch -Filter 'PerformanceTestResults_*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if($latest){Copy-Item $latest.FullName (Join-Path $B 'Performance_Archive_Latest.csv')}}"
       />
     </Node>
-
-    <Node Name="EnsureJUnit" Requires="CollectArtifacts" If="$(EnableTests)">
-      <Spawn Exe="powershell.exe" Arguments="-NoProfile -ExecutionPolicy Bypass -Command ^
-        $B='$(ProjectRoot)\Saved\Automation\_Bundle'; ^
-        if(!(Test-Path $B)){exit 0}; ^
-        $hasXml=(Get-ChildItem -Path $B -Recurse -Filter *.xml -ErrorAction SilentlyContinue | Measure-Object).Count -gt 0; ^
-        if($hasXml){exit 0}; ^
-        $jsons=Get-ChildItem -Path $B -Recurse -Filter index.json -ErrorAction SilentlyContinue; ^
-        foreach($j in $jsons){ ^
-          $suite=Split-Path $j.DirectoryName -Leaf; ^
-          $xmlPath=Join-Path $j.DirectoryName 'junit-converted.xml'; ^
-          $doc=New-Object System.Xml.XmlDocument; ^
-          $root=$doc.CreateElement('testsuite'); ^
-          $null=$root.SetAttribute('name',$suite); ^
-          $null=$root.SetAttribute('tests','0'); ^
-          $null=$root.SetAttribute('failures','0'); ^
-          $null=$root.SetAttribute('errors','0'); ^
-          $null=$doc.AppendChild($root); ^
-          $doc.Save($xmlPath) ^
-        }" />
-    </Node>
   </Agent>
 
   <Agent Name="Analysis Agent" Type="Win64">
@@ -203,7 +184,7 @@
 
   <Property Name="TestNodes" Value="" />
   <Property Name="TestNodes" Value="$(TestNodes);RunEditorTests;RunClientTests_Func;RunClientTests_AI" If="$(EnableTests)" />
-  <Property Name="TestNodes" Value="$(TestNodes);CollectArtifacts;EnsureJUnit" If="$(EnableTests)" />
+  <Property Name="TestNodes" Value="$(TestNodes);CollectArtifacts" If="$(EnableTests)" />
   <Aggregate Name="Test" Requires="$(TestNodes)" If="'$(TestNodes)' != ''" />
 
   <Property Name="AnalysisNodes" Value="" />

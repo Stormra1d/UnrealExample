@@ -118,8 +118,7 @@ jobs:
             "-set:BuildConfiguration=$env:BUILD_CONFIGURATION",
             "-set:TargetPlatform=$env:TARGET_PLATFORM",
             "-set:EnableTests=${{ github.event.inputs.enable_tests || 'true' }}",
-            "-set:EnablePackage=${{ github.event.inputs.enable_packaging || 'true' }}",
-            "-set:EnableLinting=true"
+            "-set:EnablePackage=${{ github.event.inputs.enable_packaging || 'true' }}"
           )
           & $RunUAT @args
           if ($LASTEXITCODE -ne 0) {
@@ -288,7 +287,6 @@ jobs:
             -set:ProjectName=$env:PROJECT_NAME `
             -set:ProjectRoot="$ProjectRoot" `
             -set:BuildConfiguration=$env:BUILD_CONFIGURATION `
-            -set:EnableLinting=true
 
       - name: Upload Analysis Results
         if: always()
