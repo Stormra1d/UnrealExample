@@ -170,10 +170,16 @@
         $jsons=Get-ChildItem -Path $B -Recurse -Filter index.json -ErrorAction SilentlyContinue; ^
         foreach($j in $jsons){ ^
           $suite=Split-Path $j.DirectoryName -Leaf; ^
-          $xml=Join-Path $j.DirectoryName 'junit-converted.xml'; ^
-          Set-Content -Path $xml -Encoding UTF8 -Value '<?xml version=""1.0"" encoding=""UTF-8""?><testsuite name=""'+$suite+'"" tests=""0"" failures=""0"" errors=""0""></testsuite>' ^
-        }"
-      />
+          $xmlPath=Join-Path $j.DirectoryName 'junit-converted.xml'; ^
+          $doc=New-Object System.Xml.XmlDocument; ^
+          $root=$doc.CreateElement('testsuite'); ^
+          $null=$root.SetAttribute('name',$suite); ^
+          $null=$root.SetAttribute('tests','0'); ^
+          $null=$root.SetAttribute('failures','0'); ^
+          $null=$root.SetAttribute('errors','0'); ^
+          $null=$doc.AppendChild($root); ^
+          $doc.Save($xmlPath) ^
+        }" />
     </Node>
   </Agent>
 
