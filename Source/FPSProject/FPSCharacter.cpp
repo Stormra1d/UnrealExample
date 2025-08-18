@@ -158,10 +158,10 @@ void AFPSCharacter::StopJump() {
 void AFPSCharacter::ApplyDamage(float Amount) {
 	CurrentHealth -= Amount;
 	CurrentHealth = FMath::Clamp(CurrentHealth, 0.f, MaxHealth);
+	GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Green, FString::Printf(TEXT("Player Health: %.1f"), CurrentHealth));
 	if (CurrentHealth <= 0.f) {
 		{
 			bIsDead = true;
-			GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("DEAD"));
 			if (!bIsTestMode) {
 				UGameplayStatics::OpenLevel(this, FName("MainMenu"));
 			}

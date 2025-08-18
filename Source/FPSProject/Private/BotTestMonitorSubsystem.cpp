@@ -22,17 +22,20 @@ void UBotTestMonitorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 
     GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, FString::Printf(TEXT("WE INITIALIZED THE SUBSYSTEM")));
 
-    // Register the tick delegate
-    TickHandle = FTSTicker::GetCoreTicker().AddTicker(
-        FTickerDelegate::CreateUObject(this, &UBotTestMonitorSubsystem::Tick)
-    );
+    FWorldDelegates::OnPostWorldInitialization.AddUObject(this, &UBotTestMonitorSubsystem::OnWorldInitialized);
 
-    StartTest();
+    FWorldDelegates::OnWorldBeginTearDown.AddUObject(this, &UBotTestMonitorSubsystem::OnWorldTearDown);
 }
 
 void UBotTestMonitorSubsystem::Deinitialize()
 {
-    FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);
+    FWorldDelegates::OnPostWorldInitialization.RemoveAll(this);
+    FWorldDelegates::OnWorldBeginTearDown.RemoveAll(this);
+
+    if (TickHandle.IsValid())
+    {
+        FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);
+    }
     Super::Deinitialize();
 }
 
@@ -62,7 +65,7 @@ bool UBotTestMonitorSubsystem::Tick(float DeltaTime)
     UE_LOG(LogTemp, Log, TEXT("World valid: %s"), *World->GetName());
 
     AFPSCharacter* Player = TestPlayerPawn;
-    if (!Player) {
+    if (!IsValid(Player)) {
         GEngine->AddOnScreenDebugMessage(-1, 10.0f, FColor::Red, TEXT("No TestPlayerPawn, using fallback"));
         UE_LOG(LogTemp, Warning, TEXT("TestPlayerPawn is null, attempting fallback"));
         Player = Cast<AFPSCharacter>(UGameplayStatics::GetPlayerPawn(World, 0));
@@ -154,17 +157,25 @@ void UBotTestMonitorSubsystem::StartTest() {
 
 void UBotTestMonitorSubsystem::NotifyTestComplete(EBotTestOutcome Outcome, float TimeTakenParam) {
     if (bFinished) return;
-    TestResult = Outcome;
     bFinished = true;
+
+    TestResult = Outcome;
     TimeTaken = TimeTakenParam;
+
     StopReplay();
+
     if (bIsBatchMode) {
         AppendToBatchLog();
     }
     else {
         WriteSingleRunLog();
     }
+
     UE_LOG(LogTemp, Warning, TEXT("TEST OUTCOME: %d, TimeTaken: %.2f"), (int32)Outcome, TimeTaken);
+    
+    if (GEngine && bIsAIPlaytest) {
+        GEngine->Exec(GetWorld(), TEXT("quit"));
+    }
 }
 
 void UBotTestMonitorSubsystem::WriteSingleRunLog() {
@@ -247,4 +258,29 @@ void UBotTestMonitorSubsystem::CollectPerformanceMetrics(float& OutAvgFPS, float
     }
     FPlatformMemoryStats MemStats = FPlatformMemory::GetStats();
     OutMaxMemory = MemStats.UsedPhysical / (1024.0f * 1024.0f);
+}
+
+void UBotTestMonitorSubsystem::OnWorldInitialized(UWorld* World, const UWorld::InitializationValues IVS)
+{
+    if (World && World->IsGameWorld() && bIsAIPlaytest)
+    {
+        if (TickHandle.IsValid())
+        {
+            FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);
+        }
+        TickHandle = FTSTicker::GetCoreTicker().AddTicker(
+            FTickerDelegate::CreateUObject(this, &UBotTestMonitorSubsystem::Tick)
+        );
+
+        StartTest();
+    }
+}
+
+void UBotTestMonitorSubsystem::OnWorldTearDown(UWorld* World)
+{
+    if (World && World->IsGameWorld() && bIsAIPlaytest)
+    {
+        UE_LOG(LogTemp, Warning, TEXT("World tearing down. Invalidating TestPlayerPawn."));
+        TestPlayerPawn = nullptr;
+    }
 }

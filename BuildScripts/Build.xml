@@ -119,7 +119,6 @@
         -unattended -nop4 -nosplash" />
     </Node>
 
-
 <!--
     <Node Name="RunClientTests_UI" Requires="StageProject" If="$(EnableTests)">
       <Log Message="Running Client Automation (Group:UI) via Gauntlet" />
@@ -146,6 +145,7 @@
         -reportdir=&quot;$(AutomationOutDir)\Client\Visual&quot;
         -Timeout=1800"/>
     </Node>
+    -->
 
     <Node Name="RunClientTests_Perf" Requires="StageProject" If="$(EnableTests)">
       <Log Message="Running Client Automation (Group:Perf) via Gauntlet" />
@@ -158,7 +158,6 @@
         -build=local
         -reportdir=&quot;$(AutomationOutDir)\Client\Perf&quot;"/>
     </Node>
-     -->
 
     <Node Name="RunClientTests_AI" Requires="StageProject" If="$(EnableTests)">
       <Log Message="Running Client Automation (Group:AI) via Gauntlet" />
@@ -219,8 +218,8 @@
   <Property Name="TestNodes" Value="" />
   <Property Name="TestNodes" Value="$(TestNodes);RunEditorTests;RunClientTests_AI;TestBlueprintCompilation" If="$(EnableTests)" />
   <!--<Property Name="TestNodes" Value="$(TestNodes);RunClientTests_UI" />
-  <Property Name="TestNodes" Value="$(TestNodes);RunClientTests_Visual" /> 
-  <Property Name="TestNodes" Value="$(TestNodes);RunClientTests_Perf" /> -->
+  <Property Name="TestNodes" Value="$(TestNodes);RunClientTests_Visual" /> -->
+  <Property Name="TestNodes" Value="$(TestNodes);RunClientTests_Perf" /> 
   <Aggregate Name="Test" Requires="$(TestNodes)" If="'$(TestNodes)' != ''" />
 
   <Property Name="AnalysisNodes" Value="" />

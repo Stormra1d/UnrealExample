@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/World.h"
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Containers/Ticker.h"
 #include "../FPSCharacter.h"
@@ -129,4 +130,7 @@ private:
 	FString LastKnownMapName;
 	float LevelTransitionTimer = 0.0f;
 	static constexpr float MAX_LEVEL_TRANSITION_WAIT = 15.0f;
+
+	void OnWorldInitialized(UWorld* World, const UWorld::InitializationValues IVS);
+	void OnWorldTearDown(UWorld* World);
 };
