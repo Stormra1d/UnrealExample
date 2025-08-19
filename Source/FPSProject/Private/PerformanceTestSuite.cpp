@@ -69,11 +69,11 @@ struct FWaitForPerformanceTestSuiteCompletion : public IAutomationLatentCommand 
 						Test->AddError(TEXT("One or more performance tests failed"));
 					}
 
-					FString ArchiveDir = FPaths::ProjectDir() + TEXT("ArchivedResults/");
-					IFileManager::Get().MakeDirectory(*ArchiveDir, true);
-					FString ArchivePath = ArchiveDir + "PerformanceTestResults_" + FDateTime::Now().ToString(TEXT("%Y%m%d_%H%M%S")) + ".csv";
+					FString ArchiveDir = FPaths::ProjectSavedDir() / TEXT("Automation/Performance/");
+					IFileManager::Get().MakeDirectory(*ArchiveDir, /*Tree=*/true);
+					FString ArchivePath = ArchiveDir + "PerformanceTestResults_" +
+						FDateTime::Now().ToString(TEXT("%Y%m%d_%H%M%S")) + ".csv";
 					IFileManager::Get().Copy(*ArchivePath, *CSVPath);
-					IFileManager::Get().Delete(*CSVPath);
 
 					return true;
 				}
