@@ -313,11 +313,11 @@ jobs:
           }
 
       # Create Release
-      - name: Create GitHub Release (with asset)
+      - name: Create GitHub Release
         if: success() && github.ref == 'refs/heads/main' && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: build-${{ github.run_number }}           # create/use this tag
+          tag_name: build-${{ github.run_number }}
           name: Build ${{ github.run_number }}
           body: |
             Automated build from commit ${{ github.sha }}
@@ -333,7 +333,6 @@ jobs:
   static-analysis:
     name: Static Code Analysis
     runs-on: [self-hosted, windows]
-    if: github.event_name == 'pull_request'
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
