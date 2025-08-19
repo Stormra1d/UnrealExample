@@ -287,15 +287,30 @@ jobs:
           }
       
           $auto = Join-Path $PWD 'PerformanceTestResults_Automation.csv'
-          if (Test-Path $auto) {
-            "`n### PerformanceTestResults_Automation.csv (first 10 rows)" | Out-File $s -Append -Encoding utf8
-            $rows = Import-Csv $auto
+          if (-not (Test-Path $auto)) {
+            $auto = Get-ChildItem -Path (Join-Path $PWD 'Saved\Automation\Performance') -Filter *.csv -Recurse -ErrorAction SilentlyContinue |
+                    Sort-Object LastWriteTime -Descending | Select-Object -ExpandProperty FullName -First 1
+          }
+          
+          if ($auto -and (Test-Path $auto)) {
+            "`n### Performance CSV (first 10 rows)`n" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            $rows = Import-Csv -Path $auto
             if ($rows.Count -gt 0) {
-              $cols = ($rows[0].PsObject.Properties.Name)
-              "| " + ($cols -join " | ") + " |" | Out-File $s -Append -Encoding utf8
-              "| " + (($cols | ForEach-Object { "---" }) -join " | ") + " |" | Out-File $s -Append -Encoding utf8
-              $rows | Select-Object -First 10 | ForEach-Object { "| " + ($cols | ForEach-Object { "$($_.$_)" } -join " | ") + " |" | Out-File $s -Append -Encoding utf8 }
+              $cols = $rows[0].PSObject.Properties.Name
+          
+              # Header
+              "| " + ($cols -join " | ") + " |" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              "| " + (($cols | ForEach-Object { '---' }) -join " | ") + " |" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+          
+              # Rows
+              $rows | Select-Object -First 10 | ForEach-Object {
+                $row = $_
+                $vals = $cols | ForEach-Object { $row.$_ }
+                "| " + ($vals -join " | ") + " |" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+              }
             }
+          } else {
+            "`n_No performance CSV found in project root or Saved/Automation/Performance._" | Out-File $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
           }
 
       - name: Zip Packaged Build (for release asset)
