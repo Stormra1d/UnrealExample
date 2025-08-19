@@ -313,27 +313,20 @@ jobs:
           }
 
       # Create Release
-      - name: Create Release
-        if: success() && github.ref == 'refs/heads/main' && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: build-${{ github.run_number }}
-          release_name: Build ${{ github.run_number }}
-          body: |
-            Automated build from commit ${{ github.sha }}
-
-            Configuration: ${{ env.BUILD_CONFIGURATION }}
-            Platform: ${{ env.TARGET_PLATFORM }}
-          draft: false
-          prerelease: ${{ env.BUILD_CONFIGURATION != 'Shipping' }}
-
-      - name: Attach Packaged Build to Release
+      - name: Create GitHub Release (with asset)
         if: success() && github.ref == 'refs/heads/main' && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
         uses: softprops/action-gh-release@v2
         with:
-         files: packaged-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}.zip
+          tag_name: build-${{ github.run_number }}           # create/use this tag
+          name: Build ${{ github.run_number }}
+          body: |
+            Automated build from commit ${{ github.sha }}
+      
+            Configuration: ${{ env.BUILD_CONFIGURATION }}
+            Platform: ${{ env.TARGET_PLATFORM }}
+          prerelease: ${{ env.BUILD_CONFIGURATION != 'Shipping' }}
+          draft: false
+          files: packaged-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
