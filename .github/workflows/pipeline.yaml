@@ -165,7 +165,13 @@ jobs:
           foreach ($f in $jsonFiles) {
             $j = Get-Content $f.FullName -Raw | ConvertFrom-Json
             $suite = $doc.CreateElement('testsuite')
-            $suite.SetAttribute('name', [IO.Path]::GetFileNameWithoutExtension($f.Name))
+            $relPath = Resolve-Path $f.FullName
+            $relPath = $relPath.Path.Substring($PWD.Path.Length).TrimStart('\','/')
+            $relDir  = Split-Path $relPath -Parent -Resolve:$false
+            $relDir  = $relDir -replace '^[\\\/]',''
+            if ([string]::IsNullOrWhiteSpace($relDir)) { $relDir = 'Root' }
+            
+            $suite.SetAttribute('name', $relDir)
       
             $tests     = @($j.tests)
             $failCnt   = ($tests | Where-Object { $_.state -in @('Fail','Failed') -or $_.errors -gt 0 }).Count
