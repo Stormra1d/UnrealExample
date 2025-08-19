@@ -130,106 +130,175 @@ jobs:
             exit $LASTEXITCODE
           }
 
-      # Collect CI bundle
-      - name: Collect CI bundle
-        if: always()
-        shell: powershell
-        run: |
-          $bundle = "ArtifactsBundle"
-          if (Test-Path $bundle) { Remove-Item -Recurse -Force $bundle }
-          New-Item -ItemType Directory -Path $bundle | Out-Null
-          if (Test-Path ".\Saved\Automation\_Bundle") { robocopy ".\Saved\Automation\_Bundle" "$bundle" /E /NFL /NDL /NJH /NJS /NP | Out-Null }
-          foreach ($m in @{From="Saved\Automation";To="$bundle\_Raw\Automation"}, @{From="Saved\Logs";To="$bundle\_Raw\Logs"}, @{From="Saved\StagedBuilds";To="$bundle\_Raw\StagedBuilds"}) {
-            if (Test-Path $m.From) { New-Item -ItemType Directory -Path $m.To -Force | Out-Null; robocopy $m.From $m.To /E /NFL /NDL /NJH /NJS /NP | Out-Null }
-          }
-          Compress-Archive -Path "$bundle\*" -DestinationPath "ci-bundle.zip" -Force
-
-      # Upload artifacts
-      - name: Upload CI bundle (raw)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-bundle-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
-          path: ArtifactsBundle/**/*
-          retention-days: 14
-
-      - name: Upload CI bundle (zip)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ci-bundle-zip-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
-          path: ci-bundle.zip
-          retention-days: 30
-
       - name: Upload Build Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: build-logs-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
           path: Saved/Logs/**/*
+          if-no-files-found: ignore
           retention-days: 7
 
+      - name: Convert Gauntlet JSON to JUnit
+        if: always()
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $jsonFiles = Get-ChildItem -Path "Saved\Automation" -Recurse -File -Filter *.json -ErrorAction SilentlyContinue | Where-Object {
+            try {
+              $j = Get-Content $_.FullName -Raw | ConvertFrom-Json
+              $j.tests -and $j.devices
+            } catch { $false }
+          }
+      
+          if (-not $jsonFiles) { Write-Host "No UE JSON reports found."; exit 0 }
+      
+          $doc = New-Object System.Xml.XmlDocument
+          $decl = $doc.CreateXmlDeclaration("1.0","UTF-8",$null); $doc.AppendChild($decl) | Out-Null
+          $suites = $doc.CreateElement('testsuites'); $doc.AppendChild($suites) | Out-Null
+      
+          foreach ($f in $jsonFiles) {
+            $j = Get-Content $f.FullName -Raw | ConvertFrom-Json
+            $suite = $doc.CreateElement('testsuite')
+            $suite.SetAttribute('name', [IO.Path]::GetFileNameWithoutExtension($f.Name))
+      
+            $tests     = @($j.tests)
+            $failCnt   = ($tests | Where-Object { $_.state -in @('Fail','Failed') -or $_.errors -gt 0 }).Count
+            $skipCnt   = ($tests | Where-Object { $_.state -in @('Skipped','NotRun') }).Count
+            $timeSum   = [Math]::Round( ($tests | Measure-Object -Property duration -Sum).Sum, 3 )
+      
+            $suite.SetAttribute('tests',    [string]$tests.Count)
+            $suite.SetAttribute('failures', [string]$failCnt)
+            $suite.SetAttribute('skipped',  [string]$skipCnt)
+            $suite.SetAttribute('time',     [string]$timeSum)
+      
+            foreach ($t in $tests) {
+              $case = $doc.CreateElement('testcase')
+              $nsParts = $t.fullTestPath -split '\.'
+              $class   = if ($nsParts.Length -gt 1) { ($nsParts[0..($nsParts.Length-2)] -join '.') } else { 'UE.Automation' }
+              $case.SetAttribute('classname', $class)
+              $case.SetAttribute('name',      "$($t.testDisplayName)")
+              $case.SetAttribute('time',      ([string]([Math]::Round([double]$t.duration,3))))
+      
+              if ($t.state -in @('Skipped','NotRun')) {
+                $case.AppendChild($doc.CreateElement('skipped')) | Out-Null
+              } elseif ($t.state -ne 'Success' -or [int]$t.errors -gt 0) {
+                $fail = $doc.CreateElement('failure')
+                $fail.SetAttribute('message', "State=$($t.state); Errors=$($t.errors); Warnings=$($t.warnings)")
+                $case.AppendChild($fail) | Out-Null
+              }
+              $suite.AppendChild($case) | Out-Null
+            }
+            $suites.AppendChild($suite) | Out-Null
+          }
+      
+          $outDir = "Saved\Automation\JUnit"
+          New-Item -ItemType Directory -Force -Path $outDir | Out-Null
+          $out = Join-Path $outDir "gauntlet.junit.xml"
+          $doc.Save($out)
+          Write-Host "JUnit written: $out"
+      
       - name: Upload Test Results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
           path: Saved/Automation/**/*
+          if-no-files-found: ignore
           retention-days: 14
-
+      
       - name: Upload Packaged Build
         if: success() && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
         uses: actions/upload-artifact@v4
         with:
           name: packaged-build-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}
           path: Saved/StagedBuilds/**/*
+          if-no-files-found: ignore
           retention-days: 30
 
-      # Publish JUnit
       - name: Publish Test Results
         if: always()
         uses: dorny/test-reporter@v1
         with:
           name: Unreal Automation Tests
-          path: |
-            Saved/Automation/**/*.xml
-            ArtifactsBundle/**/*.xml
+          path: Saved/Automation/JUnit/**/*.xml
           reporter: java-junit
           fail-on-error: false
+          fail-on-empty: true
 
-      # Summary (plain)
       - name: Generate workflow summary
         if: always()
         shell: powershell
         run: |
           $s = $env:GITHUB_STEP_SUMMARY
           "## CI Summary ($env:BUILD_CONFIGURATION / $env:TARGET_PLATFORM)" | Out-File $s -Encoding utf8
-          $xmlCount = (Get-ChildItem -Path "Saved\Automation","ArtifactsBundle" -Recurse -Filter *.xml -ErrorAction SilentlyContinue | Measure-Object).Count
-          "JUnit XML files: $xmlCount" | Out-File $s -Append
+      
+          $xmlCount = (Get-ChildItem -Path "Saved\Automation\JUnit" -Recurse -Filter *.xml -ErrorAction SilentlyContinue | Measure-Object).Count
+          "JUnit XML files: $xmlCount" | Out-File $s -Append -Encoding utf8
+      
+          $jsonFiles = Get-ChildItem -Path "Saved\Automation" -Recurse -File -Filter *.json -ErrorAction SilentlyContinue
+          if ($jsonFiles) {
+            $all = @()
+            foreach ($f in $jsonFiles) {
+              try {
+                $j = Get-Content $f.FullName -Raw | ConvertFrom-Json
+                if ($j.tests) { $all += $j }
+              } catch { }
+            }
+            if ($all.Count -gt 0) {
+              $tests   = @($all | ForEach-Object { $_.tests } | Where-Object { $_ })
+              $passed  = ($tests | Where-Object { $_.state -eq 'Success' }).Count
+              $failed  = ($tests | Where-Object { $_.state -in @('Fail','Failed') -or $_.errors -gt 0 }).Count
+              $skipped = ($tests | Where-Object { $_.state -in @('Skipped','NotRun') }).Count
+              $dur     = [Math]::Round( ($tests | Measure-Object -Property duration -Sum).Sum, 2 )
+      
+              "`n### UE Automation Results" | Out-File $s -Append -Encoding utf8
+              "| Metric | Value |"                          | Out-File $s -Append -Encoding utf8
+              "|---|---:|"                                  | Out-File $s -Append -Encoding utf8
+              "| Total tests | $($tests.Count) |"           | Out-File $s -Append -Encoding utf8
+              "| Passed | $passed |"                        | Out-File $s -Append -Encoding utf8
+              "| Failed | $failed |"                        | Out-File $s -Append -Encoding utf8
+              "| Skipped | $skipped |"                      | Out-File $s -Append -Encoding utf8
+              "| Duration (s) | $dur |"                     | Out-File $s -Append -Encoding utf8
+      
+              $failedTests = $tests | Where-Object { $_.state -in @('Fail','Failed') -or $_.errors -gt 0 } | Select-Object -First 20
+              if ($failedTests) {
+                "`n<details><summary>First 20 failing tests</summary>" | Out-File $s -Append -Encoding utf8
+                "| Test | State | Errors | Warnings | Time(s) |" | Out-File $s -Append -Encoding utf8
+                "|---|---|---:|---:|---:|" | Out-File $s -Append -Encoding utf8
+                foreach ($t in $failedTests) {
+                  $line = "| $($t.fullTestPath) | $($t.state) | $($t.errors) | $($t.warnings) | $([Math]::Round($t.duration,3)) |"
+                  $line | Out-File $s -Append -Encoding utf8
+                }
+                "</details>" | Out-File $s -Append -Encoding utf8
+              }
+            }
+          }
+      
           $auto = Join-Path $PWD 'PerformanceTestResults_Automation.csv'
           if (Test-Path $auto) {
-            "`n### PerformanceTestResults_Automation.csv (first 10 rows)" | Out-File $s -Append
+            "`n### PerformanceTestResults_Automation.csv (first 10 rows)" | Out-File $s -Append -Encoding utf8
             $rows = Import-Csv $auto
             if ($rows.Count -gt 0) {
               $cols = ($rows[0].PsObject.Properties.Name)
-              "| " + ($cols -join " | ") + " |" | Out-File $s -Append
-              "| " + (($cols | ForEach-Object { "---" }) -join " | ") + " |" | Out-File $s -Append
-              $rows | Select-Object -First 10 | ForEach-Object { "| " + ($cols | ForEach-Object { "$($_.$_)" } -join " | ") + " |" | Out-File $s -Append }
+              "| " + ($cols -join " | ") + " |" | Out-File $s -Append -Encoding utf8
+              "| " + (($cols | ForEach-Object { "---" }) -join " | ") + " |" | Out-File $s -Append -Encoding utf8
+              $rows | Select-Object -First 10 | ForEach-Object { "| " + ($cols | ForEach-Object { "$($_.$_)" } -join " | ") + " |" | Out-File $s -Append -Encoding utf8 }
             }
           }
-          $arch = Join-Path $PWD 'ArchiveDirectory'
-          if (Test-Path $arch) {
-            $latest = Get-ChildItem $arch -Filter 'PerformanceTestResults_*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-            if ($latest) {
-              "`n### $($latest.Name) (first 10 rows)" | Out-File $s -Append
-              $rows = Import-Csv $latest.FullName
-              if ($rows.Count -gt 0) {
-                $cols = ($rows[0].PsObject.Properties.Name)
-                "| " + ($cols -join " | ") + " |" | Out-File $s -Append
-                "| " + (($cols | ForEach-Object { "---" }) -join " | ") + " |" | Out-File $s -Append
-                $rows | Select-Object -First 10 | ForEach-Object { "| " + ($cols | ForEach-Object { "$($_.$_)" } -join " | ") + " |" | Out-File $s -Append }
-              }
-            }
+
+      - name: Zip Packaged Build (for release asset)
+        if: success() && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
+        shell: powershell
+        run: |
+          $src = Join-Path $PWD "Saved\StagedBuilds\${{ env.TARGET_PLATFORM }}"
+          if (Test-Path $src) {
+            $zip = "packaged-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}.zip"
+            if (Test-Path $zip) { Remove-Item $zip -Force }
+            Compress-Archive -Path (Join-Path $src '*') -DestinationPath $zip -Force
+            Write-Host "Created $zip"
+          } else {
+            Write-Host "No packaged build found at $src"
           }
 
       # Create Release
@@ -249,12 +318,11 @@ jobs:
           draft: false
           prerelease: ${{ env.BUILD_CONFIGURATION != 'Shipping' }}
 
-      # Attach ZIP to Release
-      - name: Attach CI bundle to Release
+      - name: Attach Packaged Build to Release
         if: success() && github.ref == 'refs/heads/main' && (github.event.inputs.enable_packaging == 'true' || github.event.inputs.enable_packaging == null)
         uses: softprops/action-gh-release@v2
         with:
-          files: ci-bundle.zip
+         files: packaged-${{ env.BUILD_CONFIGURATION }}-${{ env.TARGET_PLATFORM }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -294,4 +362,5 @@ jobs:
         with:
           name: static-analysis-results
           path: Saved/Logs/**/*StaticAnalysis*
+          if-no-files-found: ignore
           retention-days: 7
