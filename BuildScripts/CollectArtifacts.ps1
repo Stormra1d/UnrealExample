@@ -41,7 +41,7 @@ if (Test-Path $auto) {
   Copy-Item $auto (Join-Path $bundle 'Performance_Automation.csv') -Force
 }
 
-$arch = Join-Path $Root 'ArchiveDirectory'
+$arch = Join-Path $Root 'ArchivedResults'
 if (Test-Path $arch) {
   $latest = Get-ChildItem $arch -Filter 'PerformanceTestResults_*.csv' |
             Sort-Object LastWriteTime -Descending | Select-Object -First 1

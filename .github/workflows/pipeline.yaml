@@ -43,7 +43,7 @@ env:
   TARGET_PLATFORM: ${{ github.event.inputs.target_platform || 'Win64' }}
 
 permissions:
-  contents: read
+  contents: write
   checks: write
   pull-requests: write
 
