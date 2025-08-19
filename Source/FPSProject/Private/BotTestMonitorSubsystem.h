@@ -131,6 +131,12 @@ private:
 	float LevelTransitionTimer = 0.0f;
 	static constexpr float MAX_LEVEL_TRANSITION_WAIT = 15.0f;
 
+	float LastMovementTime = 0.f;
+	FVector LastPos = FVector::ZeroVector;
+	float MovementEps = 5.f;
+	float SpeedEps = 5.f;
+	float StuckTimeout = 60.f;
+
 	void OnWorldInitialized(UWorld* World, const UWorld::InitializationValues IVS);
 	void OnWorldTearDown(UWorld* World);
 };

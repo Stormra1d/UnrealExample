@@ -105,23 +105,49 @@ bool UBotTestMonitorSubsystem::Tick(float DeltaTime)
         }
     }
 
-    GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, TEXT("TESTTIMEOUT"));
     UE_LOG(LogTemp, Log, TEXT("Checking timeout: Elapsed=%.2f, MaxDuration=%.2f"), Elapsed, MaxDuration);
+
+    const FVector CurPos = Player->GetActorLocation();
+    const FVector Delta = CurPos - LastPos;
+    const float Speed = Player->GetVelocity().Size();
+
+    if (Elapsed == 0.f) { 
+        LastPos = CurPos; 
+        LastMovementTime = 0.f; 
+    }
 
     if (Elapsed > MaxDuration) {
         NotifyTestComplete(EBotTestOutcome::Timeout, Elapsed);
         return true;
     }
 
+    bool bMoved = Delta.Size() > MovementEps || Speed > SpeedEps;
+    if (bMoved) {
+        LastMovementTime = Elapsed;
+        LastPos = CurPos;
+    }
+
+    if ((Elapsed - LastMovementTime) > StuckTimeout) {
+        NotifyTestComplete(EBotTestOutcome::GotStuck, Elapsed);
+        return true;
+    }
+
     GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, TEXT("TESTPLAYER"));
     UE_LOG(LogTemp, Log, TEXT("Checking player: %s"), *Player->GetName());
 
-    if (!Player || Player->IsPendingKillPending() || Player->GetCurrentHealth() <= 0) {
+    if (!Player || Player->IsPendingKillPending()) {
         if (Elapsed > 5.0f) {
             NotifyTestComplete(EBotTestOutcome::Error, Elapsed);
             return true;
         }
         return false;
+    }
+
+    if (Player->GetCurrentHealth() <= 0) {
+        if (Elapsed > 5.0f) {
+            NotifyTestComplete(EBotTestOutcome::Died, Elapsed);
+            return true;
+        }
     }
 
     int32 TotalCollected = Player->RedRubyCount + Player->BlueSapphireCount;
