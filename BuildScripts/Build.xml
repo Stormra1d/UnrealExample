@@ -143,24 +143,8 @@
     </Node>
 
     <Node Name="CollectArtifacts" Requires="RunEditorTests;RunClientTests_Func;RunClientTests_AI" If="$(EnableTests)">
-      <Spawn Exe="powershell.exe" Arguments="-NoProfile -ExecutionPolicy Bypass -Command ^
-        $Root='$(ProjectRoot)'; ^
-        $B=Join-Path $Root 'Saved\Automation\_Bundle'; ^
-        if (Test-Path $B){Remove-Item -Recurse -Force $B}; ^
-        New-Item -ItemType Directory -Path $B | Out-Null; ^
-        foreach($p in 'Saved\Automation\Editor\Automation','Saved\Automation\Client\Func\Automation','Saved\Automation\Client\AI\Automation'){ ^
-          $src=Join-Path $Root $p; if(Test-Path $src){robocopy $src (Join-Path $B (Split-Path $p -Leaf)) *.xml *.json *.html /E | Out-Null} ^
-        }; ^
-        $top=Join-Path $Root 'Saved\Automation'; ^
-        if(Test-Path (Join-Path $top 'index.json')){Copy-Item (Join-Path $top 'index.*') $B -ErrorAction SilentlyContinue}; ^
-        $bot=Join-Path $Root 'Saved\Automation\BotResults\Latest.json'; ^
-        if(Test-Path $bot){New-Item -ItemType Directory -Path (Join-Path $B 'BotResults') -Force | Out-Null; Copy-Item $bot (Join-Path $B 'BotResults')}; ^
-        $logs=Join-Path $Root 'Saved\Logs'; ^
-        if(Test-Path $logs){New-Item -ItemType Directory -Path (Join-Path $B 'Logs') -Force | Out-Null; robocopy $logs (Join-Path $B 'Logs') *.log /E | Out-Null}; ^
-        $auto=Join-Path $Root 'PerformanceTestResults_Automation.csv'; if(Test-Path $auto){Copy-Item $auto (Join-Path $B 'Performance_Automation.csv')}; ^
-        $arch=Join-Path $Root 'ArchiveDirectory'; ^
-        if(Test-Path $arch){$latest=Get-ChildItem $arch -Filter 'PerformanceTestResults_*.csv' | Sort-Object LastWriteTime -Descending | Select-Object -First 1; if($latest){Copy-Item $latest.FullName (Join-Path $B 'Performance_Archive_Latest.csv')}}"
-      />
+      <Spawn Exe="powershell.exe"
+            Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectRoot)\BuildScripts\CollectArtifacts.ps1&quot; -Root &quot;$(ProjectRoot)&quot;" />
     </Node>
   </Agent>
 
