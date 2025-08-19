@@ -42,6 +42,11 @@ env:
   BUILD_CONFIGURATION: ${{ github.event.inputs.build_configuration || 'Development' }}
   TARGET_PLATFORM: ${{ github.event.inputs.target_platform || 'Win64' }}
 
+permissions:
+  contents: read
+  checks: write
+  pull-requests: write
+
 jobs:
   build-and-test:
     name: Build, Cook, Package & Test
