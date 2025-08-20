@@ -137,12 +137,31 @@
         -unattended -nop4 -nosplash" />
     </Node>
 
+    <Node Name="RunEditorTests_UI" Requires="BuildEditor" If="$(EnableTests)">
+      <Command Name="RunUnreal" Arguments="
+        -project=&quot;$(ProjectFile)&quot;
+        -platform=$(TargetPlatform)
+        -configuration=$(BuildConfiguration)
+        -test=UE.EditorAutomation
+        -runtest=Group:UI
+        -build=editor
+        -reportdir=&quot;$(AutomationOutDir)\Editor\UI\Gauntlet&quot;
+        -ReportExportPath=&quot;$(AutomationOutDir)\Editor\UI\Automation&quot;
+        -reportall
+        -reportexporters=xml
+        -timeout=18000
+        -maxtestduration=18000
+        -MaxDuration=18000
+        -heartbeatperiod=60
+        -unattended -nop4 -nosplash" />
+    </Node>
+
     <Node Name="TestBlueprintCompilation" Requires="BuildEditor" If="$(EnableTests)">
       <Commandlet Name="CompileAllBlueprints" Project="$(ProjectFile)" />
       <Tag Files="$(AutomationOutDir)\..." With="#AutomationReports" If="$(EnableTests)" />
     </Node>
 
-    <Node Name="CollectArtifacts" Requires="RunEditorTests;RunClientTests_Func;RunClientTests_AI" If="$(EnableTests)">
+    <Node Name="CollectArtifacts" Requires="RunEditorTests;RunEditorTests_UI;RunClientTests_Func;RunClientTests_AI" If="$(EnableTests)">
       <Spawn Exe="powershell.exe"
             Arguments="-NoProfile -ExecutionPolicy Bypass -File &quot;$(ProjectRoot)\BuildScripts\CollectArtifacts.ps1&quot; -Root &quot;$(ProjectRoot)&quot;" />
     </Node>
@@ -167,7 +186,7 @@
   <Property Name="PackageNodes" Value="$(PackageNodes);StageProject;PackageProject" If="$(EnablePackage)" />
 
   <Property Name="TestNodes" Value="" />
-  <Property Name="TestNodes" Value="$(TestNodes);RunEditorTests;RunClientTests_Func;RunClientTests_AI" If="$(EnableTests)" />
+  <Property Name="TestNodes" Value="$(TestNodes);RunEditorTests;RunEditorTests_UI;RunClientTests_Func;RunClientTests_AI" If="$(EnableTests)"/>
   <Property Name="TestNodes" Value="$(TestNodes);CollectArtifacts" If="$(EnableTests)" />
   <Aggregate Name="Test" Requires="$(TestNodes)" If="'$(TestNodes)' != ''" />
 

@@ -6,6 +6,7 @@ New-Item -ItemType Directory -Path $bundle | Out-Null
 
 $paths = @(
   'Saved\Automation\Editor\Automation',
+  'Saved\Automation\Editor\UI\Automation',
   'Saved\Automation\Client\Func\Automation',
   'Saved\Automation\Client\AI\Automation'
 )

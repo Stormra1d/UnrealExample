@@ -17,7 +17,10 @@ public class FPSProject : ModuleRules
 			PrivateDependencyModuleNames.AddRange(new[] {
 			"UnrealEd",
 			"AutomationDriver",
-			"AutomationDriverTests"
+			"AutomationDriverTests",
+			"EnhancedInput",
+			"Slate",
+			"SlateCore"
 			});
 		}
 		// Uncomment if you are using Slate UI
