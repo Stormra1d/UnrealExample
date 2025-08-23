@@ -7,13 +7,12 @@
 #include "../FPSWeaponBase.h"
 #include "GameFramework/PlayerController.h"
 #include "TimerManager.h"
+#include "Misc/AutomationTest.h"
 
 AFPS_SmokeFunctionalTest::AFPS_SmokeFunctionalTest()
-	: TestPlayer(nullptr), TestWeapon(nullptr) {
+	: TestPlayer(nullptr), TestWeapon(nullptr), TestController(nullptr) {
 	Rename(TEXT("SmokeFunctionalTest"));
 	Description = "Testing";
-
-
 }
 
 void AFPS_SmokeFunctionalTest::StartTest() {
@@ -29,40 +28,69 @@ void AFPS_SmokeFunctionalTest::StartTest() {
 	}
 	TestPlayer->bIsTestMode = true;
 
+	TestController = GetWorld()->SpawnActor<APlayerController>();
+	if (!TestController) {
+		FinishTest(EFunctionalTestResult::Failed, TEXT("Controller could not be spawned"));
+		return;
+	}
+	TestController->Possess(TestPlayer);
+
 	TestWeapon = GetWorld()->SpawnActor<AFPSWeaponBase>(AFPSWeaponBase::StaticClass());
 	if (!TestWeapon) {
 		FinishTest(EFunctionalTestResult::Failed, TEXT("Weapon could not be spawned"));
 		return;
 	}
-
 	TestPlayer->SetPrimaryWeapon(TestWeapon);
+
+	AssertTrue(TestPlayer->GetPrimaryWeapon() == TestWeapon, TEXT("Primary Weapon should be set to TestWeapon"));
+
+	FVector InitialLocation = TestPlayer->GetActorLocation();
 	TestPlayer->AddMovementInput(FVector::ForwardVector, 1.f);
 	TestPlayer->AddMovementInput(FVector::RightVector, 1.f);
 
+	int32 InitialAmmo = TestWeapon->BulletsInMag;
 	TestPlayer->StartFire();
-	TestPlayer->Reload();
+
+	FTimerHandle FireHandle;
+	GetWorld()->GetTimerManager().SetTimer(FireHandle, [this]()
+		{
+			TestPlayer->StopFire();
+			TestPlayer->Reload();
+		}, 0.0f, false);
+
+	AssertTrue(TestWeapon->BulletsInMag < InitialAmmo, TEXT("Firing reduced ammo"));
 
 	const float InitialHealth = TestPlayer->GetCurrentHealth();
 	TestPlayer->ApplyDamage(InitialHealth + 10.0f);
 
+	FTimerHandle CheckHandle;
 	FTimerDelegate TimerDel;
-	TimerDel.BindLambda([this]() {
+	TimerDel.BindLambda([this, InitialLocation]() {
+		FVector NewLocation = TestPlayer->GetActorLocation();
+		AssertTrue(FVector::Dist(InitialLocation, NewLocation) > 0.f, TEXT("Movement applied"));
+
 		if (!IsValid(TestPlayer) || TestPlayer->GetCurrentHealth() <= 0.0f) {
 			FinishTest(EFunctionalTestResult::Succeeded, TEXT("Smoke Test Passed"));
 		}
 		else {
 			FinishTest(EFunctionalTestResult::Failed, TEXT("Player did not die"));
 		}
-
-		if (TestPlayer && IsValid(TestPlayer)) {
-			TestPlayer->Destroy();
-			TestPlayer = nullptr;
-		}
-		if (TestWeapon && IsValid(TestWeapon)) {
-			TestWeapon->Destroy();
-			TestWeapon = nullptr;
-		}
-
+		CleanUp();
 		});
-	GetWorld()->GetTimerManager().SetTimerForNextTick(TimerDel);
+	GetWorld()->GetTimerManager().SetTimer(CheckHandle, TimerDel, 0.0f, false);
+}
+
+void AFPS_SmokeFunctionalTest::CleanUp() {
+	if (TestPlayer && IsValid(TestPlayer)) {
+		TestPlayer->Destroy();
+		TestPlayer = nullptr;
+	}
+	if (TestWeapon && IsValid(TestWeapon)) {
+		TestWeapon->Destroy();
+		TestWeapon = nullptr;
+	}
+	if (TestController && IsValid(TestController)) {
+		TestController->Destroy();
+		TestController = nullptr;
+	}
 }

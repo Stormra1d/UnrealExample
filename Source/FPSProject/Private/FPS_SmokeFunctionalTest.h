@@ -15,8 +15,10 @@ public:
 	AFPS_SmokeFunctionalTest();
 
 	virtual void StartTest() override;
+	void CleanUp();
 
 private:
 	class AFPSCharacter* TestPlayer = nullptr;
 	class AFPSWeaponBase* TestWeapon = nullptr;
+	class APlayerController* TestController = nullptr;
 };
