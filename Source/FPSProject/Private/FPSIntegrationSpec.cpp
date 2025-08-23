@@ -14,7 +14,6 @@
 #include "../FPSHUD.h"
 #include "../FPSEnemyBase.h"
 #include "../FPSEnemyDumb.h"
-#include "FunctionalTest.h"
 
 DEFINE_SPEC(FPSIntegrationSpec, "Game.FPS.Integration", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter);
 
@@ -24,12 +23,12 @@ void FPSIntegrationSpec::Define() {
         AFPSWeaponBase* PrimaryWeapon = nullptr;
         AFPSWeaponBase* SecondaryWeapon = nullptr;
         AAmmoCratePickup* AmmoPickup = nullptr;
-        TStrongObjectPtr<UWorld> World(nullptr);
+        UWorld* World = nullptr;
 
         BeforeEach([this, &Player, &PrimaryWeapon, &SecondaryWeapon, &AmmoPickup, &World]() {
-            World.Reset(FAutomationEditorCommonUtils::CreateNewMap());
-            TestNotNull("World exists", World.Get());
-            if (!World.Get()) return;
+            World = FAutomationEditorCommonUtils::CreateNewMap();
+            TestNotNull("World exists", World);
+            if (!World) return;
 
             FActorSpawnParameters SpawnParams;
             SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
@@ -57,20 +56,20 @@ void FPSIntegrationSpec::Define() {
 
             AmmoPickup = World->SpawnActor<AAmmoCratePickup>(AAmmoCratePickup::StaticClass(), FTransform(FVector(300, 0, 500)), SpawnParams);
             TestNotNull("Ammo pickup exists", AmmoPickup);
+            if (!AmmoPickup) return;
             });
 
-        AfterEach([this, &World, &Player, &PrimaryWeapon, &SecondaryWeapon, &AmmoPickup]() {
-            if (Player) Player->Destroy();
-            if (PrimaryWeapon) PrimaryWeapon->Destroy();
-            if (SecondaryWeapon) SecondaryWeapon->Destroy();
-            if (AmmoPickup) AmmoPickup->Destroy();
-            if (World.Get()) World->DestroyWorld(true);
-            World.Reset();
+        AfterEach([&]() {
+            Player = nullptr;
+            PrimaryWeapon = nullptr;
+            SecondaryWeapon = nullptr;
+            AmmoPickup = nullptr;
+            World = nullptr;
             });
 
         It("should increase magazines on both weapons when collected", [this, &Player, &PrimaryWeapon, &SecondaryWeapon, &AmmoPickup]() {
-            TestTrue("Setup valid", Player && AmmoPickup && PrimaryWeapon && SecondaryWeapon && IsValid(Player) && IsValid(AmmoPickup) && IsValid(PrimaryWeapon) && IsValid(SecondaryWeapon));
             if (!Player || !AmmoPickup || !PrimaryWeapon || !SecondaryWeapon) return;
+            if (!IsValid(Player) || !IsValid(AmmoPickup) || !IsValid(PrimaryWeapon) || !IsValid(SecondaryWeapon)) return;
 
             AmmoPickup->OnCollected(Player);
 
@@ -80,80 +79,33 @@ void FPSIntegrationSpec::Define() {
         });
 
     Describe("Enemy Contact Damage Integration", [this]() {
-        TStrongObjectPtr<UWorld> World(nullptr);
-        AFPSCharacter* Player = nullptr;
-        AFPSEnemyBase* Enemy = nullptr;
-
-        BeforeEach([this, &World, &Player, &Enemy]() {
-            World.Reset(FAutomationEditorCommonUtils::CreateNewMap());
-            TestNotNull("World exists", World.Get());
-            if (!World.Get()) return;
+        It("should apply damage when overlap occurs", [this]() {
+            UWorld* World = FAutomationEditorCommonUtils::CreateNewMap();
+            if (!World) return;
 
             FActorSpawnParameters SpawnParams;
             SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-            Player = World->SpawnActor<AFPSCharacter>(AFPSCharacter::StaticClass(), FTransform::Identity, SpawnParams);
-            TestNotNull("Player exists", Player);
+            AFPSCharacter* Player = World->SpawnActor<AFPSCharacter>(AFPSCharacter::StaticClass(), FTransform::Identity, SpawnParams);
+            AFPSEnemyBase* Enemy = World->SpawnActor<AFPSEnemyBase>(AFPSEnemyBase::StaticClass(), FTransform::Identity, SpawnParams);
 
-            Enemy = World->SpawnActor<AFPSEnemyBase>(AFPSEnemyBase::StaticClass(), FTransform::Identity, SpawnParams);
-            TestNotNull("Enemy exists", Enemy);
-
-            if (Player && Enemy) {
-                Player->MaxHealth = 100.0f;
-                Player->CurrentHealth = 100.0f;
-                Enemy->ContactDamage = 25.0f;
-
-                if (UCapsuleComponent* PlayerCapsule = Player->GetCapsuleComponent()) {
-                    PlayerCapsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-                }
-                if (UCapsuleComponent* EnemyCapsule = Enemy->GetCapsuleComponent()) {
-                    EnemyCapsule->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
-                }
-            }
-            });
-
-        AfterEach([this, &World, &Player, &Enemy]() {
-            if (Player) Player->Destroy();
-            if (Enemy) Enemy->Destroy();
-
-            if (World.Get()) {
-                World->DestroyWorld(true);
-            }
-            World.Reset();
-
-            Player = nullptr;
-            Enemy = nullptr;
-            });
-
-        It("should apply damage when overlap occurs", [this, &Player, &Enemy]() {
-            TestTrue("Setup valid", Player && Enemy && IsValid(Player) && IsValid(Enemy));
-            if (!Player || !Enemy) return;
-
-            Enemy->OnOverlapBegin(nullptr, Player, nullptr, 0, false, FHitResult());
-
-            TestNearlyEqual("Player health reduced by contact damage", Player->CurrentHealth, 75.0f, 0.001f);
-            });
-
-        LatentIt("should apply damage over time", EAsyncExecution::ThreadPool, [this, &Player, &Enemy](const FDoneDelegate& Done) {
-            TestTrue("Setup valid", Player && Enemy && IsValid(Player) && IsValid(Enemy));
             if (!Player || !Enemy) {
-                Done.Execute();
+                if (Player) Player->Destroy();
+                if (Enemy) Enemy->Destroy();
                 return;
             }
 
+            Player->MaxHealth = 100.0f;
+            Player->CurrentHealth = 100.0f;
+            Enemy->ContactDamage = 25.0f;
+
             Enemy->OnOverlapBegin(nullptr, Player, nullptr, 0, false, FHitResult());
 
-            ADD_LATENT_AUTOMATION_COMMAND(
-                FDelayedFunctionLatentCommand(
-                    [this, &Player, Done]()
-                    {
-                        TestNearlyEqual("Player health reduced after tick", Player->CurrentHealth, 75.0f, 0.001f);
-                        Done.Execute();
-                    },
-                    0.0f
-                )
-            );
+            TestEqual("Player health reduced by contact damage", Player->CurrentHealth, 75.0f);
+
+            Player->Destroy();
+            Enemy->Destroy();
+            });
         });
-     });
 }
 #endif

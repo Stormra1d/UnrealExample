@@ -56,15 +56,15 @@ void APlayerAIController::SetTarget(const FVector& NewTarget)
 {
     if (!ControlledCharacter) return;
 
-    CurrentTarget = NewTarget;
-    bHasTarget = true;
-    CurrentIntent = ENavigationIntent::Following;
-
-    // Interrupt any current maneuver
-    if (CurrentIntent == ENavigationIntent::ExecutingManeuver)
+    ENavigationIntent PreviousIntent = CurrentIntent;
+    if (PreviousIntent == ENavigationIntent::ExecutingManeuver)
     {
         CompleteManeuver(false);
     }
+
+    CurrentTarget = NewTarget;
+    bHasTarget = true;
+    CurrentIntent = ENavigationIntent::Following;
 
     UpdatePath();
     //LogState(FString::Printf(TEXT("New target set: %s"), *NewTarget.ToString()), FColor::Green);
@@ -85,12 +85,10 @@ void APlayerAIController::Tick(float DeltaTime)
 
     if (!ControlledCharacter) return;
 
-    // Update tracking variables
     FVector CurrentLocation = ControlledCharacter->GetActorLocation();
     bool bOnNavMesh = IsOnNavMesh(CurrentLocation);
 
     // ALWAYS try to engage enemies, regardless of other states
-    // This ensures continuous aiming updates
     bool bEngagingEnemy = TryEngageNearbyEnemy();
 
     if (bOnNavMesh)
@@ -99,7 +97,6 @@ void APlayerAIController::Tick(float DeltaTime)
         LastValidPosition = CurrentLocation;
     }
 
-    // Check for stuck condition (but not if we're in combat)
     if (!bEngagingEnemy) {
         float MovementThisFrame = FVector::Dist(CurrentLocation, LastValidPosition);
         if (MovementThisFrame < 5.f && !LastMovementDirection.IsZero())
@@ -112,7 +109,6 @@ void APlayerAIController::Tick(float DeltaTime)
             LastValidPosition = CurrentLocation;
         }
 
-        // Handle emergency conditions
         if (StuckTimer > StuckThreshold && CurrentIntent != ENavigationIntent::EmergencyRecovery)
         {
             //LogState(TEXT("STUCK! Starting emergency recovery"), FColor::Red);
@@ -120,11 +116,9 @@ void APlayerAIController::Tick(float DeltaTime)
         }
     }
     else {
-        // Reset stuck timer when in combat
         StuckTimer = 0.f;
     }
 
-    // State-based processing (skip if engaging enemy)
     if (!bEngagingEnemy) {
         switch (CurrentIntent)
         {
@@ -139,21 +133,17 @@ void APlayerAIController::Tick(float DeltaTime)
             break;
         case ENavigationIntent::Idle:
         default:
-            // Do nothing
             break;
         }
     }
 
     bWasOnNavMeshLastFrame = bOnNavMesh;
 
-    // Debug visualization
     if (bDebugVisualization)
     {
         DrawDebugInfo();
     }
 }
-
-// === CORE NAVIGATION ===
 
 void APlayerAIController::UpdatePath()
 {
@@ -198,10 +188,8 @@ void APlayerAIController::ProcessNavigation(float DeltaTime)
             {
                 //LogState(TEXT("Path invalid but target not reached - checking for drop opportunity"), FColor::Orange);
 
-                // Before regenerating path, check if we need to drop
                 FVector DirectionToTarget = (CurrentTarget - CurrentLocation).GetSafeNormal2D();
 
-                // Check if there's a drop opportunity toward the target
                 FPathChallenge DropChallenge = CheckForDropToTarget(DirectionToTarget);
                 if (DropChallenge.IsValid() && DropChallenge.RequiredAction == EManeuverType::Drop)
                 {
@@ -214,7 +202,6 @@ void APlayerAIController::ProcessNavigation(float DeltaTime)
                     }
                 }
 
-                // If no drop opportunity, try normal path regeneration
                 UpdatePath();
             }
         }
@@ -225,17 +212,15 @@ void APlayerAIController::ProcessNavigation(float DeltaTime)
     FVector CurrentLocation = ControlledCharacter->GetActorLocation();
     FVector DirectionToWaypoint = (NextPoint - CurrentLocation).GetSafeNormal2D();
 
-    // Smoothly rotate character toward the waypoint direction
     if (!DirectionToWaypoint.IsZero())
     {
         FRotator TargetRotation = DirectionToWaypoint.Rotation();
         FRotator CurrentRotation = ControlledCharacter->GetActorRotation();
 
-        // Only rotate around Z-axis (yaw)
         TargetRotation.Pitch = CurrentRotation.Pitch;
         TargetRotation.Roll = CurrentRotation.Roll;
 
-        // Smoothly interpolate to target rotation
+        // Interpolation
         float RotationSpeed = 180.f; // degrees per second
         FRotator NewRotation = FMath::RInterpTo(CurrentRotation, TargetRotation, DeltaTime, RotationSpeed / 180.f);
 
@@ -253,7 +238,7 @@ void APlayerAIController::ProcessNavigation(float DeltaTime)
         return;
     }
 
-    // Look ahead for challenges - but look toward the next waypoint, not forward
+    // Look ahead for challenges
     if (!DirectionToWaypoint.IsZero())
     {
         FPathChallenge Challenge = AnalyzePathAhead(150.f, DirectionToWaypoint); // Pass direction
@@ -275,7 +260,6 @@ void APlayerAIController::ProcessNavigation(float DeltaTime)
         }
     }
 
-    // Normal movement toward next waypoint
     if (!DirectionToWaypoint.IsZero())
     {
         LastMovementDirection = DirectionToWaypoint;
@@ -288,7 +272,7 @@ void APlayerAIController::ProcessNavigation(float DeltaTime)
         LogState("Is Crouched", FColor::Red);
 
         CrouchTimer += DeltaTime;
-        if (CrouchTimer > 1.f) // Try to stand up periodically
+        if (CrouchTimer > 1.f)
         {
             bool bCanStandNow = ControlledCharacter->CanStandUp();
 
@@ -311,8 +295,6 @@ void APlayerAIController::ProcessNavigation(float DeltaTime)
     }
 }
 
-// === PREDICTIVE PLANNING ===
-
 FPathChallenge APlayerAIController::AnalyzePathAhead(float LookaheadDistance, const FVector& MovementDirection)
 {
     FPathChallenge Challenge;
@@ -322,7 +304,6 @@ FPathChallenge APlayerAIController::AnalyzePathAhead(float LookaheadDistance, co
     FVector CurrentLocation = ControlledCharacter->GetActorLocation();
     FVector ActualForwardVector = ControlledCharacter->GetActorForwardVector();
 
-    // Use movement direction for drops, but check obstacles in multiple directions
     FVector MovementDir = MovementDirection.IsZero() ? ActualForwardVector : MovementDirection;
 
     //LogState(FString::Printf(TEXT("AnalyzePathAhead: Movement=%s, Forward=%s"),
@@ -333,8 +314,7 @@ FPathChallenge APlayerAIController::AnalyzePathAhead(float LookaheadDistance, co
     const UWorld* World = GetWorld();
     float CapsuleHalfHeight = ControlledCharacter->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
 
-    // 1. First, check for obstacles ONLY in the movement direction
-    // This prevents detecting irrelevant side obstacles when there's a clear path ahead
+    // Check for obstacles ONLY in the movement direction
     FHitResult MovementHit;
     FVector TraceStart = CurrentLocation;
     FVector TraceEnd = TraceStart + MovementDir * 150.f;
@@ -361,7 +341,7 @@ FPathChallenge APlayerAIController::AnalyzePathAhead(float LookaheadDistance, co
         }
     }
 
-    // 2. Check for crouch obstacles in movement direction
+    // Check for crouch obstacles in movement direction
     FVector HeadCheckStart = CurrentLocation + FVector(0, 0, CapsuleHalfHeight * 0.8f);
     FVector HeadCheckEnd = HeadCheckStart + MovementDir * 120.f;
 
@@ -387,13 +367,11 @@ FPathChallenge APlayerAIController::AnalyzePathAhead(float LookaheadDistance, co
         }
     }
 
-    // 3. Only if there's no clear path in movement direction, check other directions for alternative obstacles
-    // This handles cases where character facing doesn't match movement (like your original crouch issue)
+    // This handles cases where character facing doesn't match movement
     if (!bObstacleInMovementPath && !MovementDir.Equals(ActualForwardVector, 0.1f))
     {
         //LogState(TEXT("No obstacle in movement path, checking facing direction for environmental hazards"), FColor::Black);
 
-        // Check facing direction for crouch obstacles (most common case)
         HeadCheckEnd = HeadCheckStart + ActualForwardVector * 120.f;
         if (World->LineTraceSingleByChannel(MovementHit, HeadCheckStart, HeadCheckEnd, ECC_Visibility, Params))
         {
@@ -418,7 +396,6 @@ FPathChallenge APlayerAIController::AnalyzePathAhead(float LookaheadDistance, co
         }
     }
 
-    // 3. Check for drop opportunities ONLY in the movement direction
     TArray<float> CheckDistances = { 50.f, 100.f, 150.f };
     for (float Distance : CheckDistances)
     {
@@ -438,7 +415,6 @@ FPathChallenge APlayerAIController::AnalyzePathAhead(float LookaheadDistance, co
                 {
                     if (HasNavMeshAtLocation(GroundLocation))
                     {
-                        // Additional check: make sure this drop makes sense contextually
                         if (HasValidPath() && CurrentPathIndex < PathPoints.Num())
                         {
                             FVector NextWaypoint = PathPoints[CurrentPathIndex];
@@ -524,14 +500,12 @@ bool APlayerAIController::ValidateManeuverPlan(const FManeuverPlan& Plan)
         return IsDropSafe(Plan.StartPosition, Plan.TargetPosition);
 
     case EManeuverType::Crouch:
-        return true; // Crouch is generally safe
+        return true;
 
     default:
         return false;
     }
 }
-
-// === MANEUVER EXECUTION ===
 
 void APlayerAIController::StartManeuver(const FManeuverPlan& Plan)
 {
@@ -549,7 +523,6 @@ void APlayerAIController::StartManeuver(const FManeuverPlan& Plan)
         break;
 
     case EManeuverType::Drop:
-        // For drops, we'll force falling mode and move forward
         bWaitingForLanding = true;
         if (UCharacterMovementComponent* MoveComp = ControlledCharacter->GetCharacterMovement())
         {
@@ -582,7 +555,6 @@ void APlayerAIController::ExecuteManeuver(float DeltaTime)
 
     ManeuverTimer += DeltaTime;
 
-    // Timeout check
     if (ManeuverTimer > CurrentManeuver.ExpectedDuration || ManeuverTimer > MaxManeuverDuration)
     {
         //LogState(TEXT("Maneuver timed out"), FColor::Orange);
@@ -590,24 +562,20 @@ void APlayerAIController::ExecuteManeuver(float DeltaTime)
         return;
     }
 
-    // Continue movement in planned direction
     if (!CurrentManeuver.MovementDirection.IsZero())
     {
         MoveInWorldDirection(CurrentManeuver.MovementDirection);
     }
 
-    // Check for completion conditions
     FVector CurrentLocation = ControlledCharacter->GetActorLocation();
 
     switch (CurrentManeuver.Type)
     {
     case EManeuverType::Jump:
     case EManeuverType::Drop:
-        // Wait for landing callback
         if (!bWaitingForLanding)
         {
-            // Add a small delay after landing to ensure we're stable
-            if (ManeuverTimer > 0.5f) // Wait at least 0.5 seconds after landing
+            if (ManeuverTimer > 0.5f)
             {
                 FVector CurrentLocation2 = ControlledCharacter->GetActorLocation();
                 bool bOnNavMesh = IsOnNavMesh(CurrentLocation2);
@@ -620,7 +588,6 @@ void APlayerAIController::ExecuteManeuver(float DeltaTime)
         }
         else
         {
-            // Still waiting for landing - check if we've been falling too long
             if (ManeuverTimer > 3.0f) // If falling for more than 3 seconds, something's wrong
             {
                // LogState(TEXT("Maneuver taking too long - forcing completion"), FColor::Red);
@@ -631,15 +598,33 @@ void APlayerAIController::ExecuteManeuver(float DeltaTime)
         break;
 
     case EManeuverType::Crouch:
-        // Check if we've passed the obstacle
-        if (ManeuverTimer > 1.f) // Give some time for crouching
+        if (!CurrentManeuver.MovementDirection.IsZero())
         {
-            FVector Direction = (CurrentManeuver.TargetPosition - CurrentLocation).GetSafeNormal2D();
-            float DistanceToTarget = FVector::Dist2D(CurrentLocation, CurrentManeuver.TargetPosition);
+            MoveInWorldDirection(CurrentManeuver.MovementDirection);
+        }
 
-            if (DistanceToTarget < 50.f)
+        if (ManeuverTimer > 0.5f)
+        {
+            bool bCanStand = ControlledCharacter->CanStandUp();
+
+            if (bCanStand)
             {
-                CompleteManeuver(true);
+                bool bOnNavMesh = IsOnNavMesh(ControlledCharacter->GetActorLocation());
+
+                if (bOnNavMesh)
+                {
+                    LogState(TEXT("Crouch clear and on NavMesh. Completing maneuver."), FColor::Green);
+
+                    if (ControlledCharacter->bIsCrouchedCustom)
+                    {
+                        ControlledCharacter->ToggleCrouch();
+                    }
+                    CompleteManeuver(true);
+                }
+                else
+                {
+                    LogState(TEXT("Can stand, but not on NavMesh. Continuing forward."), FColor::Orange);
+                }
             }
         }
         break;
@@ -658,7 +643,6 @@ void APlayerAIController::CompleteManeuver(bool bSuccess)
         //LogState(FString::Printf(TEXT("Maneuver completed successfully: %d"), (int32)CompletedType), FColor::Green);
         CurrentIntent = ENavigationIntent::Following;
 
-        // Recalculate path from new position
         UpdatePath();
     }
     else
@@ -668,8 +652,6 @@ void APlayerAIController::CompleteManeuver(bool bSuccess)
     }
 }
 
-// === OBSTACLE ANALYSIS ===
-
 bool APlayerAIController::AnalyzeJumpObstacle(const FVector& ObstacleLocation, FManeuverPlan& OutPlan)
 {
     FVector CurrentLocation = ControlledCharacter->GetActorLocation();
@@ -677,7 +659,7 @@ bool APlayerAIController::AnalyzeJumpObstacle(const FVector& ObstacleLocation, F
 
     // Predict landing location
     FVector LandingCheckStart = CurrentLocation + ForwardVector * 200.f;
-    LandingCheckStart.Z = CurrentLocation.Z + 50.f; // Jump height
+    LandingCheckStart.Z = CurrentLocation.Z + 50.f;
 
     FVector GroundLocation;
     if (HasGroundAtLocation(LandingCheckStart, MaxSafeDropHeight, &GroundLocation))
@@ -713,15 +695,12 @@ bool APlayerAIController::AnalyzeDropOpportunity(const FVector& EdgeLocation, FM
 
 bool APlayerAIController::AnalyzeCrouchObstacle(const FVector& ObstacleLocation, FManeuverPlan& OutPlan)
 {
-    // For crouch obstacles, target is past the obstacle
     FVector Direction = (ObstacleLocation - ControlledCharacter->GetActorLocation()).GetSafeNormal2D();
     OutPlan.TargetPosition = ObstacleLocation + Direction * 100.f;
     OutPlan.MovementDirection = Direction;
     OutPlan.bTargetIsOnNavMesh = true;
     return true;
 }
-
-// === SAFETY CHECKS ===
 
 bool APlayerAIController::IsJumpSafe(const FVector& StartPos, const FVector& LandingPos)
 {
@@ -773,8 +752,6 @@ bool APlayerAIController::HasGroundAtLocation(const FVector& Location, float Max
     return false;
 }
 
-// === EMERGENCY RECOVERY ===
-
 void APlayerAIController::StartEmergencyRecovery()
 {
     CurrentIntent = ENavigationIntent::EmergencyRecovery;
@@ -783,7 +760,6 @@ void APlayerAIController::StartEmergencyRecovery()
     TriedRecoveryDirections.Empty();
     StuckTimer = 0.f;
 
-    // Cancel any ongoing maneuver
     if (CurrentManeuver.IsValid())
     {
         CompleteManeuver(false);
@@ -796,7 +772,6 @@ void APlayerAIController::HandleEmergencyRecovery(float DeltaTime)
 {
     RecoveryTimer += DeltaTime;
 
-    // Check if we're back on navmesh
     FVector CurrentLocation = ControlledCharacter->GetActorLocation();
     if (IsOnNavMesh(CurrentLocation))
     {
@@ -809,7 +784,6 @@ void APlayerAIController::HandleEmergencyRecovery(float DeltaTime)
         return;
     }
 
-    // Timeout check
     if (RecoveryTimer > EmergencyRecoveryTimeout)
     {
      //   LogState(TEXT("Recovery timeout - teleporting to last known position"), FColor::Purple);
@@ -831,7 +805,7 @@ void APlayerAIController::HandleEmergencyRecovery(float DeltaTime)
     }
     else
     {
-        // No good direction found - try random movement
+        // Try random movement
         RecoveryAttempts++;
         if (RecoveryAttempts > 30)
         {
@@ -840,7 +814,6 @@ void APlayerAIController::HandleEmergencyRecovery(float DeltaTime)
             return;
         }
 
-        // Generate a semi-random direction that we haven't tried
         FVector RandomDirection = FVector(
             FMath::RandRange(-1.f, 1.f),
             FMath::RandRange(-1.f, 1.f),
@@ -858,24 +831,23 @@ bool APlayerAIController::FindPathToNavMesh(FVector& OutDirection)
     UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
     if (!NavSys) return false;
 
-    // Try directions toward target, last known navmesh, and cardinal directions
     TArray<FVector> TestDirections;
 
-    // Priority 1: Direction toward target
+    // Direction toward target
     if (bHasTarget)
     {
         FVector ToTarget = (CurrentTarget - CurrentLocation).GetSafeNormal2D();
         if (!ToTarget.IsZero()) TestDirections.Add(ToTarget);
     }
 
-    // Priority 2: Direction toward last known navmesh position
+    // Direction toward last known navmesh position
     if (!LastKnownNavMeshPosition.IsZero())
     {
         FVector ToLastKnown = (LastKnownNavMeshPosition - CurrentLocation).GetSafeNormal2D();
         if (!ToLastKnown.IsZero()) TestDirections.Add(ToLastKnown);
     }
 
-    // Priority 3: Cardinal and diagonal directions
+    // Cardinal and diagonal directions
     TArray<FVector> CardinalDirections = {
         FVector(1, 0, 0), FVector(-1, 0, 0), FVector(0, 1, 0), FVector(0, -1, 0),
         FVector(0.707f, 0.707f, 0), FVector(-0.707f, 0.707f, 0),
@@ -887,7 +859,6 @@ bool APlayerAIController::FindPathToNavMesh(FVector& OutDirection)
     // Test each direction
     for (const FVector& Direction : TestDirections)
     {
-        // Skip directions we've already tried recently
         bool bAlreadyTried = false;
         for (const FVector& Tried : TriedRecoveryDirections)
         {
@@ -908,7 +879,6 @@ bool APlayerAIController::FindPathToNavMesh(FVector& OutDirection)
 
             if (NavSys->ProjectPointToNavigation(TestPoint, ProjectedLocation, FVector(150.f, 150.f, 100.f)))
             {
-                // Found navmesh - make sure it's actually reachable
                 if (FVector::Dist2D(CurrentLocation, ProjectedLocation.Location) > 50.f)
                 {
                     OutDirection = Direction;
@@ -920,8 +890,6 @@ bool APlayerAIController::FindPathToNavMesh(FVector& OutDirection)
 
     return false;
 }
-
-// === UTILITY ===
 
 void APlayerAIController::MoveInWorldDirection(const FVector& Direction, float Speed)
 {
@@ -972,8 +940,6 @@ bool APlayerAIController::IsCloseToTarget(const FVector& Target, float Tolerance
     return FVector::DistSquared2D(Target, ControlledCharacter->GetActorLocation()) <= FMath::Square(Tolerance);
 }
 
-// === EVENT HANDLERS ===
-
 void APlayerAIController::OnJumpLanded(const FHitResult& Hit)
 {
     if (!ControlledCharacter) return;
@@ -987,14 +953,13 @@ void APlayerAIController::OnJumpLanded(const FHitResult& Hit)
         bLandedOnNavMesh ? TEXT("YES") : TEXT("NO"),
         ManeuverTimer), FColor::Cyan);
 
-    // Reset the maneuver timer when we land so the completion logic can work properly
+    // Reset the maneuver timer when we land
     if (CurrentIntent == ENavigationIntent::ExecutingManeuver)
     {
-        ManeuverTimer = 0.f; // Reset timer so the delay check starts from landing
+        ManeuverTimer = 0.f;
      //   LogState(TEXT("Maneuver timer reset on landing"), FColor::Green);
     }
 
-    // If we weren't expecting to land, this might be from emergency recovery
     if (CurrentIntent == ENavigationIntent::EmergencyRecovery && bLandedOnNavMesh)
     {
         CurrentIntent = ENavigationIntent::Following;
@@ -1013,18 +978,14 @@ void APlayerAIController::OnMovementModeChanged(ACharacter* InCharacter, EMoveme
 
  //   LogState(FString::Printf(TEXT("Movement mode changed: %d -> %d"), (int32)PrevMovementMode, (int32)NewMode), FColor::White);
 
-    // If we started falling unexpectedly, we might need recovery
     if (NewMode == MOVE_Falling && PrevMovementMode == MOVE_Walking)
     {
         if (CurrentIntent == ENavigationIntent::Following)
         {
-            // Unexpected fall - start tracking for potential recovery
-            StuckTimer = 0.f; // Reset stuck timer since falling is movement
+            StuckTimer = 0.f;
         }
     }
 }
-
-// === DEBUG ===
 
 void APlayerAIController::DrawDebugInfo()
 {
@@ -1035,7 +996,6 @@ void APlayerAIController::DrawDebugInfo()
 
     FVector CurrentLocation = ControlledCharacter->GetActorLocation();
 
-    // Draw current path
     if (HasValidPath())
     {
         for (int32 i = 0; i < PathPoints.Num(); i++)
@@ -1050,27 +1010,23 @@ void APlayerAIController::DrawDebugInfo()
         }
     }
 
-    // Draw target
     if (bHasTarget)
     {
         DrawDebugSphere(World, CurrentTarget, 50.f, 8, FColor::Red, false, -1.f, 0, 3.f);
         DrawDebugLine(World, CurrentLocation, CurrentTarget, FColor::Orange, false, -1.f, 0, 1.f);
     }
 
-    // Draw current maneuver info
     if (CurrentManeuver.IsValid())
     {
         DrawDebugSphere(World, CurrentManeuver.TargetPosition, 30.f, 8, FColor::Magenta, false, -1.f, 0, 2.f);
         DrawDebugLine(World, CurrentLocation, CurrentManeuver.TargetPosition, FColor::Magenta, false, -1.f, 0, 2.f);
     }
 
-    // Draw last known navmesh position
     if (!LastKnownNavMeshPosition.IsZero())
     {
         DrawDebugSphere(World, LastKnownNavMeshPosition, 20.f, 8, FColor::Cyan, false, -1.f, 0, 1.f);
     }
 
-    // Status text
     FString StatusText = FString::Printf(TEXT("Intent: %d | Maneuver: %d | OnNavMesh: %s | Stuck: %.1f"),
         (int32)CurrentIntent,
         (int32)CurrentManeuver.Type,
@@ -1114,7 +1070,6 @@ FVector APlayerAIController::FindActualEdgePosition(const FVector& StartPos, con
             LogState(FString::Printf(TEXT("NavMesh edge found at dist: %.1f, pos: %s"),
                 CurrentDist, *TestPos.ToString()), FColor::Yellow);
 
-            // Trace down to find the ground at the edge
             FCollisionQueryParams Params;
             Params.AddIgnoredActor(ControlledCharacter);
 
@@ -1165,7 +1120,6 @@ FPathChallenge APlayerAIController::CheckForDropToTarget(const FVector& Directio
         {
             LogState(TEXT("Found edge toward target - checking for safe drop"), FColor::Yellow);
 
-            // Found an edge - get the actual edge position
             FVector EdgePosition = FindActualEdgePosition(CurrentLocation, TestPoint);
 
             // Check for ground below the edge
@@ -1195,7 +1149,6 @@ FPathChallenge APlayerAIController::CheckForDropToTarget(const FVector& Directio
                 }
             }
 
-            // Found edge but no safe drop
             LogState(TEXT("Edge found but drop not safe"), FColor::Orange);
             break;
         }
@@ -1219,9 +1172,7 @@ bool APlayerAIController::TryEngageNearbyEnemy() {
     FVector PlayerLoc = ControlledCharacter->GetActorLocation();
     float CurrentTime = GetWorld()->GetTimeSeconds();
 
-    // Don't update enemy targeting too frequently for performance
     if (CurrentTime - LastEnemyUpdateTime < EnemyUpdateInterval && CurrentTargetEnemy) {
-        // Just update aiming for current target
         return UpdateCombatAiming();
     }
 
@@ -1273,7 +1224,6 @@ bool APlayerAIController::UpdateCombatAiming() {
         return false;
     }
 
-    // Check if enemy is still valid and in range
     if (CurrentTargetEnemy->IsPendingKillPending()) {
         ClearCombatTarget();
         return false;
@@ -1288,21 +1238,17 @@ bool APlayerAIController::UpdateCombatAiming() {
         return false;
     }
 
-    // Calculate aim direction - aim slightly above center mass
+    // Calculate aim direction
     FVector AimTarget = EnemyLoc + FVector(0, 0, 50);
     FVector AimDirection = (AimTarget - PlayerLoc).GetSafeNormal();
 
-    // Get current and target rotations
     FRotator CurrentControlRotation = ControlledCharacter->GetControlRotation();
     FRotator TargetRotation = AimDirection.Rotation();
 
-    // Calculate rotation difference
     FRotator DeltaRotation = TargetRotation - CurrentControlRotation;
 
-    // Normalize the rotation difference to [-180, 180] range
     DeltaRotation.Normalize();
 
-    // Apply aiming with speed limiting for smoother tracking
     float MaxRotationSpeed = AimingSpeed * GetWorld()->GetDeltaSeconds() * 57.2958f; // Convert to degrees
 
     float ClampedYaw = FMath::Clamp(DeltaRotation.Yaw, -MaxRotationSpeed, MaxRotationSpeed);
@@ -1313,7 +1259,7 @@ bool APlayerAIController::UpdateCombatAiming() {
     {
         FRotator CurrentRotation = ControlledCharacter->GetActorRotation();
         FRotator DesiredRotation = (AimTarget - PlayerLoc).Rotation();
-        DesiredRotation.Pitch = CurrentRotation.Pitch; // Ignore pitch unless you want the mesh to tilt
+        DesiredRotation.Pitch = CurrentRotation.Pitch;
 
         float RotationSpeed = 500.f;
         FRotator NewRotation = FMath::RInterpTo(CurrentRotation, DesiredRotation, GetWorld()->GetDeltaSeconds(), RotationSpeed / 180.f);
@@ -1365,6 +1311,5 @@ bool APlayerAIController::HasLineOfSightToEnemy(AFPSEnemyBase* Enemy) {
     FHitResult Hit;
     bool bHit = GetWorld()->LineTraceSingleByChannel(Hit, StartLoc, EndLoc, ECC_Visibility, Params);
 
-    // If we hit something, we don't have line of sight
     return !bHit;
 }
