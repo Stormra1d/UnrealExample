@@ -8,7 +8,7 @@ public class FPSProject : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "NavigationSystem", "UMG", "Slate", "SlateCore", "ApplicationCore", "ToolMenus", "Json", "JsonUtilities", "FunctionalTest" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "NavigationSystem", "UMG", "Slate", "SlateCore", "ApplicationCore", "ToolMenus", "Json", "JsonUtilities", "FunctionalTesting" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "ToolMenus", "Slate", "SlateCore" });
 
@@ -20,8 +20,9 @@ public class FPSProject : ModuleRules
 			"AutomationDriverTests",
 			"EnhancedInput",
 			"Slate",
-			"SlateCore"
-			});
+			"SlateCore",
+            "FunctionalTestingEditor"
+            });
 		}
 		// Uncomment if you are using Slate UI
 		// PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore" });
