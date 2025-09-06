@@ -8,7 +8,7 @@ public class FPSProject : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "NavigationSystem", "UMG", "Slate", "SlateCore", "ApplicationCore", "ToolMenus", "Json", "JsonUtilities" });
+		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "NavigationSystem", "UMG", "Slate", "SlateCore", "ApplicationCore", "ToolMenus", "Json", "JsonUtilities", "FunctionalTest" });
 
 		PrivateDependencyModuleNames.AddRange(new string[] { "ToolMenus", "Slate", "SlateCore" });
 
