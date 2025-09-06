@@ -42,10 +42,6 @@
 			"Enabled": true
 		},
 		{
-			"Name": "FunctionalTesting",
-			"Enabled": true
-		},
-		{
 			"Name": "CQTest",
 			"Enabled": true
 		},

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#if WITH_EDITOR
 #include "FunctionalTest.h"
 #include "FPS_SmokeFunctionalTest.generated.h"
 
@@ -22,3 +23,4 @@ private:
 	class AFPSWeaponBase* TestWeapon = nullptr;
 	class APlayerController* TestController = nullptr;
 };
+#endif

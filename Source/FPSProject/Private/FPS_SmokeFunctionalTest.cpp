@@ -1,6 +1,5 @@
 // Fill out your copyright notice in the Description page of Project Settings.
-
-
+#if WITH_EDITOR
 #include "FPS_SmokeFunctionalTest.h"
 #include "Engine/World.h"
 #include "../FPSCharacter.h"
@@ -94,3 +93,4 @@ void AFPS_SmokeFunctionalTest::CleanUp() {
 		TestController = nullptr;
 	}
 }
+#endif
