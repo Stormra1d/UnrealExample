@@ -15,7 +15,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogAutomatedPlayTest, Log, All);
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAutomatedPlayTest, "Game.FPSCharacter.AutomatedPlaytest", EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAutomatedPlayTest, "Game.Automation.FPSCharacter.AutomatedPlaytest", EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
 
 class FWaitForBotMonitorLatentCommand : public IAutomationLatentCommand {
 public:
