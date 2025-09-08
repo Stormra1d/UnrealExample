@@ -11,7 +11,7 @@
 
 constexpr float MIN_EXPECTED_FPS = 20.0f;
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPerformanceTestSuite, "Game.Performance.PerformanceSuite", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FPerformanceTestSuite, "Game.Performance.PerformanceSuite", EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
 
 struct FWaitForPerformanceTestSuiteCompletion : public IAutomationLatentCommand {
 	FPerformanceTestSuite* Test;
