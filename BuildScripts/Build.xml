@@ -101,7 +101,7 @@
         -runtest=Group:CI_Client
         -build=local
         -reportdir=&quot;$(AutomationOutDir)\Client\Perf\Gauntlet&quot;
-        -ReportExportPath=&quot;$(AutomationOutDir)\Client\Perf\Automation&quot;
+        -ReportExportPath=&quot;$(AutomationOutDir)\Performance&quot;
         -reportall
         -reportexporters=xml
         -timeout=18000
