@@ -236,6 +236,7 @@ jobs:
           reporter: java-junit
           fail-on-error: false
           fail-on-empty: true
+          list-tests: 'all'
 
       - name: Generate workflow summary
         if: always()
