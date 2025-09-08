@@ -20,8 +20,6 @@ class FPSPROJECT_API AFPSEnemySpawnManager : public AActor
 	
 public:	
 	AFPSEnemySpawnManager();
-
-protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
 
@@ -50,11 +48,14 @@ protected:
 	float DumbEnemySpawnTimer = 0.0f;
 	float Phase3SpawnTimer = 0.0f;
 
+	FTimerHandle Phase2Handle;
+
+protected:
+
 	void SpawnSmartEnemy();
 	void SpawnDumbEnemy();
 	FVector GetRandomNavMeshPoint() const;
 	void StartPhase2();
-	FTimerHandle Phase2Handle;
 
 public:
 	void NotifySmartEnemyDeath(AFPSEnemyPatrol* Enemy);

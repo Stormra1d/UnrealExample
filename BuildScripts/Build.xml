@@ -10,13 +10,6 @@
   <Error Message="ProjectName must be specified via -set:ProjectName=..." If="'$(ProjectName)' == ''" />
   <Error Message="ProjectRoot must be specified via -set:ProjectRoot=..." If="'$(ProjectRoot)' == ''" />
 
-  <Option Name="ProjectName" DefaultValue="" Description="Name of the project" />
-  <Option Name="ProjectRoot" DefaultValue="" Description="Root directory of the project" />
-
-  <Error Message="Project file $(ProjectFile) does not exist" If="!Exists('$(ProjectFile)')" />
-  <Error Message="ProjectName must be specified via -set:ProjectName=..." If="'$(ProjectName)' == ''" />
-  <Error Message="ProjectRoot must be specified via -set:ProjectRoot=..." If="'$(ProjectRoot)' == ''" />
-
   <Option Name="BuildConfiguration" DefaultValue="Development"
           Restrict="Debug|Development|Shipping|Test"
           Description="Build configuration" />
@@ -99,16 +92,16 @@
         -unattended -nop4 -nosplash" />
     </Node>
 
-    <Node Name="RunClientTests_Func" Requires="StageProject" If="$(EnableTests)">
+    <Node Name="RunClientTests_Func" Requires="BuildEditor" If="$(EnableTests)">
       <Command Name="RunUnreal" Arguments="
         -project=&quot;$(ProjectFile)&quot;
         -platform=$(TargetPlatform)
         -configuration=$(BuildConfiguration)
-        -test=UE.TargetAutomation
+        -test=UE.EditorAutomation
         -runtest=Group:Func
-        -build=local
-        -reportdir=&quot;$(AutomationOutDir)\Client\Func\Gauntlet&quot;
-        -ReportExportPath=&quot;$(AutomationOutDir)\Client\Func\Automation&quot;
+        -build=editor
+        -reportdir=&quot;$(AutomationOutDir)\Editor\Func\Gauntlet&quot;
+        -ReportExportPath=&quot;$(AutomationOutDir)\Editor\Func\Automation&quot;
         -reportall
         -reportexporters=xml
         -timeout=18000

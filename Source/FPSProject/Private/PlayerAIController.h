@@ -1,4 +1,3 @@
-// PlayerAIController.h
 #pragma once
 
 #include "CoreMinimal.h"
@@ -16,7 +15,7 @@ enum class ENavigationIntent : uint8
 {
     Idle,              // Not moving
     Following,         // Normal pathfinding
-    ExecutingManeuver, // Performing planned action (jump/drop/crouch)
+    ExecutingManeuver, // Performing planned action
     EmergencyRecovery  // Only when truly stuck
 };
 

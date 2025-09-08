@@ -78,15 +78,22 @@ void AFPSEnemySpawnManager::Tick(float DeltaTime)
 void AFPSEnemySpawnManager::SpawnSmartEnemy() {
 	if (!SmartEnemy) {
 		GEngine->AddOnScreenDebugMessage(-1, 4.0f, FColor::Red, TEXT("SMART ENEMY NOT SET!"));
+		CurrentSmartEnemy = nullptr;
 		return;
 	}
 	FVector Loc = GetRandomNavMeshPoint();
 	FRotator Rot = FRotator::ZeroRotator;
-	AFPSEnemyPatrol* Enemy = GetWorld()->SpawnActor<AFPSEnemyPatrol>(SmartEnemy, Loc, Rot);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+	AFPSEnemyPatrol* Enemy = GetWorld()->SpawnActor<AFPSEnemyPatrol>(SmartEnemy, Loc, Rot, SpawnParams);
 	if (Enemy) {
 		Enemy->SpawnDefaultController();
 		CurrentSmartEnemy = Enemy;
-		Enemy->OwningSpawner = this;	//TODO
+		Enemy->OwningSpawner = this;
+	} else {
+		CurrentSmartEnemy = nullptr;
 	}
 }
 
@@ -95,7 +102,11 @@ void AFPSEnemySpawnManager::SpawnDumbEnemy() {
 	FVector Loc = GetRandomNavMeshPoint();
 	FRotator Rot = FRotator::ZeroRotator;
 	Loc.Z += 100.0f;
-	AFPSEnemyDumb* Enemy = GetWorld()->SpawnActor<AFPSEnemyDumb>(DumbEnemy, Loc, Rot);
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
+
+	AFPSEnemyDumb* Enemy = GetWorld()->SpawnActor<AFPSEnemyDumb>(DumbEnemy, Loc, Rot, SpawnParams);
 	if (Enemy) {
 		Enemy->SpawnDefaultController();
 		DumbEnemies.Add(Enemy);
@@ -108,10 +119,14 @@ void AFPSEnemySpawnManager::SpawnDumbEnemy() {
 
 FVector AFPSEnemySpawnManager::GetRandomNavMeshPoint() const {
 	UNavigationSystemV1* NavSys = UNavigationSystemV1::GetCurrent(GetWorld());
-	if (!NavSys) return SpawnOrigin;
+	if (!NavSys) {
+		FVector RandomOffset = FVector(FMath::RandRange(-SpawnRadius, SpawnRadius), FMath::RandRange(-SpawnRadius, SpawnRadius), 0.0f);
+		return SpawnOrigin + RandomOffset;
+	}
 	FNavLocation NavLoc;
 	if (NavSys->GetRandomReachablePointInRadius(SpawnOrigin, SpawnRadius, NavLoc)) return NavLoc.Location;
-	return SpawnOrigin;
+	FVector RandomOffset = FVector(FMath::RandRange(-SpawnRadius * 0.5f, SpawnRadius * 0.5f), FMath::RandRange(-SpawnRadius * 0.5f, SpawnRadius * 0.5f), 0.0f);
+	return SpawnOrigin + RandomOffset;
 }
 
 void AFPSEnemySpawnManager::StartPhase2() {
