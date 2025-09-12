@@ -21,7 +21,20 @@ APerformanceTestManager::APerformanceTestManager()
 void APerformanceTestManager::BeginPlay()
 {
 	Super::BeginPlay();
-	CurrentCSVPath = FPaths::ProjectDir() + TEXT("PerformanceTestResults_Automation.csv");
+	CurrentCSVPath = FPaths::Combine(
+		FPaths::ProjectSavedDir(),
+		TEXT("Automation/Performance/PerformanceTestResults_Automation.csv")
+	);
+
+	FString OverrideCsv;
+	if (FParse::Value(FCommandLine::Get(), TEXT("PerfCSV="), OverrideCsv) && !OverrideCsv.IsEmpty())
+	{
+		CurrentCSVPath = OverrideCsv;
+	}
+
+	const FString OutDir = FPaths::GetPath(CurrentCSVPath);
+	IFileManager::Get().MakeDirectory(*OutDir, /*Tree=*/true);
+
 	if (FPaths::FileExists(CurrentCSVPath)) {
 		IFileManager::Get().Delete(*CurrentCSVPath);
 	}
