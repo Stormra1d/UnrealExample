@@ -101,6 +101,7 @@
         -runtest=Group:CI_Client
         -build=local
         -clientargs=&quot;-PerfCSV=$(AutomationOutDir)\Performance\PerformanceTestResults_Automation.csv&quot;
+        -editorargs=&quot;-PerfCSV=$(AutomationOutDir)\Performance\PerformanceTestResults_Automation.csv&quot;
         -reportdir=&quot;$(AutomationOutDir)\Client\Perf\Gauntlet&quot;
         -ReportExportPath=&quot;$(AutomationOutDir)\Performance&quot;
         -reportall

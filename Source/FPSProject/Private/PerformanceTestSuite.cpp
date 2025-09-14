@@ -92,9 +92,16 @@ struct FWaitForPerformanceTestSuiteCompletion : public IAutomationLatentCommand 
 };
 
 bool FPerformanceTestSuite::RunTest(const FString& Parameters) {
-	FString CSVPath = FPaths::ProjectDir() + TEXT("PerformanceTestResults_Automation.csv");
-	if (IFileManager::Get().FileExists(*CSVPath)) {
-		IFileManager::Get().Delete(*CSVPath);
+	FString CSVPath;
+
+	if (!FParse::Value(FCommandLine::Get(), TEXT("PerfCSV="), CSVPath) || CSVPath.IsEmpty())
+	{
+		CSVPath = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation/Performance/PerformanceTestResults_Automation.csv"));
+	}
+
+	if (IFileManager::Get().FileExists(*CSVPath))
+	{
+		IFileManager::Get().Delete(*CSVPath, /*RequireExists*/false, /*EvenReadOnly*/true, /*Quiet*/false);
 	}
 
 	AutomationOpenMap(PERFORMANCE_TEST_MAP);
