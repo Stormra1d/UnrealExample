@@ -199,8 +199,12 @@ void UBotTestMonitorSubsystem::NotifyTestComplete(EBotTestOutcome Outcome, float
 
     UE_LOG(LogTemp, Warning, TEXT("TEST OUTCOME: %d, TimeTaken: %.2f"), (int32)Outcome, TimeTaken);
     
-    if (GEngine && bIsAIPlaytest) {
-        GEngine->Exec(GetWorld(), TEXT("quit"));
+    if (GEngine && bIsAIPlaytest)
+    {
+        if (!GIsAutomationTesting && !bIsBatchMode)
+        {
+            GEngine->Exec(GetWorld(), TEXT("quit"));
+        }
     }
 }
 

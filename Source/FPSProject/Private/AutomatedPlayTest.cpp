@@ -15,7 +15,7 @@
 
 DEFINE_LOG_CATEGORY_STATIC(LogAutomatedPlayTest, Log, All);
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAutomatedPlayTest, "Game.Automation.FPSCharacter.AutomatedPlaytest", EAutomationTestFlags::ClientContext | EAutomationTestFlags::EngineFilter)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAutomatedPlayTest, "Game.Automation.FPSCharacter.AutomatedPlaytest", EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
 
 class FWaitForBotMonitorLatentCommand : public IAutomationLatentCommand {
 public:
@@ -133,6 +133,17 @@ private:
     float Elapsed;
 };
 
+class FMarkPlaytestCompleteLatentCommand : public IAutomationLatentCommand {
+public:
+    explicit FMarkPlaytestCompleteLatentCommand(FAutomatedPlayTest* InTest) : Test(InTest) {}
+    virtual bool Update() override {
+        Test->AddInfo(TEXT("AutomatedPlaytest completed; reporting to Automation framework."));
+        return true;
+    }
+private:
+    FAutomatedPlayTest* Test;
+};
+
 
 bool FAutomatedPlayTest::RunTest(const FString& Parameters) {
     if (!FParse::Param(FCommandLine::Get(), TEXT("AITest"))) {
@@ -154,6 +165,9 @@ bool FAutomatedPlayTest::RunTest(const FString& Parameters) {
 
     // Wait for AI setup and then monitor
     ADD_LATENT_AUTOMATION_COMMAND(FWaitForBotMonitorLatentCommand(this));
+
+    // Finish Test (due to async)
+    ADD_LATENT_AUTOMATION_COMMAND(FMarkPlaytestCompleteLatentCommand(this));
 
     return true;
 }
