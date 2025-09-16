@@ -136,7 +136,7 @@
         -project=&quot;$(ProjectFile)&quot;
         -platform=$(TargetPlatform)
         -configuration=$(BuildConfiguration)
-        -clientargs=&quot;-AITest&quot;
+        -clientargs=&quot;-AITest -nullrhi&quot;
         -test=UE.TargetAutomation
         -runtest=Group:AI
         -build=local
