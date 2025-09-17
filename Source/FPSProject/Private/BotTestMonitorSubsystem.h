@@ -114,6 +114,9 @@ public:
 		TestPlayerPawn = InPawn;
 	}
 
+	AFPSCharacter* GetTestPlayerPawn() const { return TestPlayerPawn; }
+	float GetMaxDuration() const { return MaxDuration; }
+
 	bool bIsAIPlaytest = false;
 
 protected:

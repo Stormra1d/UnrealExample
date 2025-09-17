@@ -136,10 +136,10 @@
         -project=&quot;$(ProjectFile)&quot;
         -platform=$(TargetPlatform)
         -configuration=$(BuildConfiguration)
-        -clientargs=&quot;-AITest -nullrhi&quot;
         -test=UE.TargetAutomation
         -runtest=Group:AI
         -build=local
+        -clientargs=&quot;-AITest -nullrhi -ExecCmds=Automation RunTests Game.Automation.FPSCharacter.AutomatedPlaytest;Quit;&quot;
         -reportdir=&quot;$(AutomationOutDir)\Client\AI\Gauntlet&quot;
         -ReportExportPath=&quot;$(AutomationOutDir)\Client\AI\Automation&quot;
         -reportall

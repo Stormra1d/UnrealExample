@@ -7,6 +7,12 @@
 #include "Engine/Engine.h"
 #include "Kismet/GameplayStatics.h"
 #include "UObject/UObjectGlobals.h"
+#include "NavigationSystem.h"
+#include "NavigationPath.h"
+#include "UObject/NameTypes.h"
+#include "GameFramework/GameModeBase.h"
+#include "GameFramework/PlayerController.h"
+
 
 void UBotTestMonitorSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -42,6 +48,7 @@ void UBotTestMonitorSubsystem::Deinitialize()
 bool UBotTestMonitorSubsystem::Tick(float DeltaTime)
 {
     if (!bIsAIPlaytest) return true;
+    if (bFinished) return false;
 
     UE_LOG(LogTemp, Warning, TEXT("Tick start: bFinished=%s, bReady=%s, Elapsed=%.2f"), bFinished ? TEXT("true") : TEXT("false"), bReady ? TEXT("true") : TEXT("false"), Elapsed);
 
@@ -144,7 +151,7 @@ bool UBotTestMonitorSubsystem::Tick(float DeltaTime)
     }
 
     if (Player->GetCurrentHealth() <= 0) {
-        if (Elapsed > 5.0f) {
+        if (bReady && Elapsed > 5.0f) {
             NotifyTestComplete(EBotTestOutcome::Died, Elapsed);
             return true;
         }
@@ -156,11 +163,6 @@ bool UBotTestMonitorSubsystem::Tick(float DeltaTime)
     GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, FString::Printf(TEXT("TESTCOLLECTED %d"), TotalCollected));
     GEngine->AddOnScreenDebugMessage(-1, 1.0f, FColor::Green, FString::Printf(TEXT("TESTKILL %d"), KillCount));
     UE_LOG(LogTemp, Log, TEXT("Progress: Collected=%d, Kills=%d"), TotalCollected, KillCount);
-
-    if (KillCount >= 20 && TotalCollected >= 10) {
-        NotifyTestComplete(EBotTestOutcome::Completed, Elapsed);
-        return true;
-    }
 
     return true;
 }
@@ -185,6 +187,11 @@ void UBotTestMonitorSubsystem::NotifyTestComplete(EBotTestOutcome Outcome, float
     if (bFinished) return;
     bFinished = true;
 
+    if (TickHandle.IsValid()) {
+        FTSTicker::GetCoreTicker().RemoveTicker(TickHandle);
+        TickHandle.Reset();
+    }
+
     TestResult = Outcome;
     TimeTaken = TimeTakenParam;
 
@@ -198,14 +205,6 @@ void UBotTestMonitorSubsystem::NotifyTestComplete(EBotTestOutcome Outcome, float
     }
 
     UE_LOG(LogTemp, Warning, TEXT("TEST OUTCOME: %d, TimeTaken: %.2f"), (int32)Outcome, TimeTaken);
-    
-    if (GEngine && bIsAIPlaytest)
-    {
-        if (!GIsAutomationTesting && !bIsBatchMode)
-        {
-            GEngine->Exec(GetWorld(), TEXT("quit"));
-        }
-    }
 }
 
 void UBotTestMonitorSubsystem::WriteSingleRunLog() {

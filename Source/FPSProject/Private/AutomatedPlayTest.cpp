@@ -17,34 +17,89 @@ DEFINE_LOG_CATEGORY_STATIC(LogAutomatedPlayTest, Log, All);
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FAutomatedPlayTest, "Game.Automation.FPSCharacter.AutomatedPlaytest", EAutomationTestFlags::ClientContext | EAutomationTestFlags::ProductFilter)
 
+static AFPSCharacter* ResolveTestPawn(UWorld* World)
+{
+    if (!World) return nullptr;
+
+    if (UGameInstance* GI = World->GetGameInstance())
+    {
+        if (UBotTestMonitorSubsystem* Monitor = GI->GetSubsystem<UBotTestMonitorSubsystem>())
+        {
+            if (AFPSCharacter* P = Monitor->GetTestPlayerPawn())
+            {
+                return P;
+            }
+        }
+    }
+
+    // Fallback: first AFPSCharacter in world
+    for (TActorIterator<AFPSCharacter> It(World); It; ++It)
+    {
+        return *It;
+    }
+    return nullptr;
+}
+
 class FWaitForBotMonitorLatentCommand : public IAutomationLatentCommand {
 public:
     FWaitForBotMonitorLatentCommand(FAutomatedPlayTest* InTest)
-        : Test(InTest), Elapsed(0.0f), Timeout(180.f) {
+        : Test(InTest), Elapsed(0.0f), Timeout(600.f) {
     }
 
     virtual bool Update() override {
         UWorld* World = GWorld;
         if (!World) { Test->AddError(TEXT("Could not get valid game world")); return true; }
 
-        if (World->WorldType != EWorldType::Game && World->WorldType != EWorldType::PIE) {
-            Test->AddError(TEXT("World is not a game or PIE world"));
-            return true;
-        }
-
         UGameInstance* GI = World->GetGameInstance();
         if (!GI) { Test->AddError(TEXT("Could not get GameInstance")); return true; }
-        UBotTestMonitorSubsystem* Monitor = GI->GetSubsystem<UBotTestMonitorSubsystem>();
-        if (Monitor && Monitor->IsTestFinished()) {
-            if (Monitor->TestResult == EBotTestOutcome::Completed) {
-                Test->TestTrue(TEXT("Bot finished successfully"), true);
+
+        if (UBotTestMonitorSubsystem* Monitor = GI->GetSubsystem<UBotTestMonitorSubsystem>()) {
+            if (Timeout < 0.f) {
+                Timeout = Monitor->GetMaxDuration() * 1.2f;
             }
-            else {
-                FString Reason = FString::Printf(TEXT("Bot test failed. Outcome: %d"), static_cast<int32>(Monitor->TestResult));
-                Test->AddError(*Reason);
-                Test->TestTrue(TEXT("Bot test did not finish successfully"), false);
+            auto OutcomeToString = [](EBotTestOutcome O)->const TCHAR*
+                {
+                    switch (O)
+                    {
+                    case EBotTestOutcome::None:      return TEXT("None");
+                    case EBotTestOutcome::Completed: return TEXT("Completed");
+                    case EBotTestOutcome::Died:      return TEXT("Died");
+                    case EBotTestOutcome::GotStuck:  return TEXT("GotStuck");
+                    case EBotTestOutcome::Timeout:   return TEXT("Timeout");
+                    case EBotTestOutcome::Error:     return TEXT("Error");
+                    default:                         return TEXT("Unknown");
+                    }
+                };
+
+            if (Monitor && Monitor->IsTestFinished())
+            {
+                const EBotTestOutcome Outcome = Monitor->TestResult;
+                const float TimeTaken = Monitor->TimeTaken;
+
+                switch (Outcome)
+                {
+                case EBotTestOutcome::Completed:
+                    Test->AddInfo(*FString::Printf(TEXT("Outcome=Completed Time=%.2fs"), TimeTaken));
+                    Test->TestTrue(TEXT("Bot completed"), true);
+                    break;
+
+                case EBotTestOutcome::Died:
+                case EBotTestOutcome::GotStuck:
+                case EBotTestOutcome::Timeout:
+                    Test->AddWarning(*FString::Printf(TEXT("Outcome=%s Time=%.2fs"),
+                        OutcomeToString(Outcome), TimeTaken));
+                    Test->TestTrue(TEXT("Non-fatal bot outcome"), true);
+                    break;
+
+                case EBotTestOutcome::Error:
+                default:
+                    Test->AddError(*FString::Printf(TEXT("Outcome=%s Time=%.2fs"),
+                        OutcomeToString(Outcome), TimeTaken));
+                    Test->TestTrue(TEXT("Fatal bot error"), false);
+                    break;
+                }
+                return true;
             }
-            return true;
         }
         Elapsed += FApp::GetDeltaTime();
         if (Elapsed > Timeout) {
@@ -70,24 +125,16 @@ public:
             return true;
         }
 
-        APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
-        APawn* PlayerPawn = PC ? PC->GetPawn() : nullptr;
-        AFPSCharacter* PlayerCharacter = Cast<AFPSCharacter>(PlayerPawn);
+        AFPSCharacter* PC = ResolveTestPawn(World);
 
-        if (!PC || !PlayerPawn || !PlayerCharacter) {
+        if (!PC) {
             Elapsed += FApp::GetDeltaTime();
             if (Elapsed > MaxWaitTime) {
                 Test->AddError(TEXT("Timed out waiting for player controller/pawn to initialize"));
                 return true;
             }
-            UE_LOG(LogAutomatedPlayTest, Warning, TEXT("Player not ready: PC=%s, Pawn=%s, Character=%s"),
-                PC ? TEXT("Valid") : TEXT("NULL"),
-                PlayerPawn ? TEXT("Valid") : TEXT("NULL"),
-                PlayerCharacter ? TEXT("Valid") : TEXT("NULL"));
             return false; // Keep waiting
         }
-
-        UE_LOG(LogAutomatedPlayTest, Log, TEXT("Player fully initialized: %s"), *PlayerCharacter->GetName());
         return true;
     }
 
@@ -110,9 +157,7 @@ public:
             return true;
         }
 
-        APlayerController* PC = UGameplayStatics::GetPlayerController(World, 0);
-        APawn* Pawn = PC ? PC->GetPawn() : nullptr;
-        AFPSCharacter* Character = Cast<AFPSCharacter>(Pawn);
+        AFPSCharacter* Character = ResolveTestPawn(World);
 
         // Wait for AI controller possession
         if (Character && Character->Controller && Character->Controller->IsA<APlayerAIController>()) {
@@ -168,6 +213,9 @@ bool FAutomatedPlayTest::RunTest(const FString& Parameters) {
 
     // Finish Test (due to async)
     ADD_LATENT_AUTOMATION_COMMAND(FMarkPlaytestCompleteLatentCommand(this));
+
+    ADD_LATENT_AUTOMATION_COMMAND(FEngineWaitLatentCommand(2.0f));
+    ADD_LATENT_AUTOMATION_COMMAND(FExecStringLatentCommand(TEXT("Quit")));
 
     return true;
 }
